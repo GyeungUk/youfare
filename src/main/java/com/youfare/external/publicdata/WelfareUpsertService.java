@@ -38,7 +38,8 @@ public class WelfareUpsertService {
     /** 한 건을 독립 트랜잭션으로 upsert. 실패해도 다른 건에 영향 없음. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void upsertOne(PublicWelfareItem item) {
-        if (!StringUtils.hasText(item.getServId())) return;
+        // 식별자·제목이 없으면 저장 불가(title은 NOT NULL) → 조용히 건너뛴다
+        if (!StringUtils.hasText(item.getServId()) || !StringUtils.hasText(item.getServNm())) return;
 
         WelfareCategory category = mapCategory(item.getLifeNmArray());
         LocalDate startDate = parseDate(item.getAplyYmd());

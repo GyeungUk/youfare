@@ -2,6 +2,14 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 
+const catMeta = {
+  HOUSING: { label: '주거', color: 'bg-sky-50 text-sky-600' },
+  EMPLOYMENT: { label: '취업', color: 'bg-violet-50 text-violet-600' },
+  FINANCE: { label: '금융', color: 'bg-amber-50 text-amber-600' },
+  EDUCATION: { label: '교육', color: 'bg-pink-50 text-pink-600' },
+  ETC: { label: '기타', color: 'bg-slate-100 text-slate-500' },
+}
+
 export default function ScrapPage() {
   const navigate = useNavigate()
   const [items, setItems] = useState([])
@@ -21,7 +29,7 @@ export default function ScrapPage() {
   async function removeScrap(welfareId) {
     try {
       await api.delete(`/scraps/${welfareId}`)
-      setItems((prev) => prev.filter((s) => s.welfareId !== welfareId))
+      setItems((prev) => prev.filter((s) => s.welfare.id !== welfareId))
     } catch {
       alert('삭제에 실패했습니다.')
     }
@@ -33,49 +41,64 @@ export default function ScrapPage() {
     <div>
       <div className="mb-8">
         <h1 className="text-3xl font-black text-slate-900">스크랩</h1>
-        <p className="text-slate-500 mt-1">저장한 복지 혜택 목록이에요</p>
+        <p className="text-slate-500 mt-1.5">저장한 복지 혜택 목록이에요</p>
       </div>
 
       {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-slate-100 rounded-2xl h-24 animate-pulse" />
+            <div key={i} className="skeleton rounded-2xl h-24" />
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="text-center py-20">
-          <p className="text-5xl mb-4">📭</p>
-          <p className="text-slate-600 font-semibold mb-2">스크랩한 혜택이 없어요</p>
-          <p className="text-slate-400 text-sm mb-6">관심 있는 혜택을 저장해 보세요</p>
+        <div className="text-center py-20 bg-white rounded-3xl ring-1 ring-slate-100">
+          <p className="text-6xl mb-4">📭</p>
+          <p className="text-slate-700 font-bold text-lg mb-2">스크랩한 혜택이 없어요</p>
+          <p className="text-slate-400 text-sm mb-7">관심 있는 혜택을 저장해 보세요</p>
           <button
             onClick={() => navigate('/welfare')}
-            className="bg-emerald-500 text-white font-bold px-6 py-3 rounded-xl hover:bg-emerald-600 transition-colors"
+            className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold px-6 py-3 rounded-2xl shadow-md shadow-emerald-500/25 hover:-translate-y-0.5 transition-all"
           >
-            혜택 둘러보기
+            혜택 둘러보기 →
           </button>
         </div>
       ) : (
         <div className="space-y-3">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className="bg-white rounded-2xl border border-slate-100 p-5 flex items-center justify-between hover:border-emerald-200 transition-colors"
-            >
+          {items.map((item) => {
+            const meta = catMeta[item.welfare.category] ?? catMeta.ETC
+            return (
               <div
-                className="flex-1 cursor-pointer"
-                onClick={() => navigate(`/welfare/${item.welfareId}`)}
+                key={item.scrapId}
+                className="lift group bg-white rounded-2xl ring-1 ring-slate-100 p-5 flex items-center justify-between gap-4 hover:ring-emerald-200 hover:shadow-lg hover:shadow-emerald-500/5"
               >
-                <p className="font-bold text-slate-900">{item.welfareTitle}</p>
-                <p className="text-sm text-slate-400 mt-0.5">{item.welfareCategory}</p>
+                <div
+                  className="flex-1 cursor-pointer min-w-0"
+                  onClick={() => navigate(`/welfare/${item.welfare.id}`)}
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${meta.color}`}>
+                      {meta.label}
+                    </span>
+                    {item.scrappedAt && (
+                      <span className="text-xs text-slate-400">
+                        {new Date(item.scrappedAt).toLocaleDateString('ko-KR')} 저장
+                      </span>
+                    )}
+                  </div>
+                  <p className="font-bold text-slate-900 truncate group-hover:text-emerald-700 transition-colors">
+                    {item.welfare.title}
+                  </p>
+                </div>
+                <button
+                  onClick={() => removeScrap(item.welfare.id)}
+                  className="shrink-0 text-slate-300 hover:text-red-500 hover:bg-red-50 w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
+                  aria-label="스크랩 삭제"
+                >
+                  🗑
+                </button>
               </div>
-              <button
-                onClick={() => removeScrap(item.welfareId)}
-                className="ml-4 text-slate-400 hover:text-red-500 transition-colors text-sm font-medium"
-              >
-                삭제
-              </button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

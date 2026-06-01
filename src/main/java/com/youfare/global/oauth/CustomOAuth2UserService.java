@@ -7,6 +7,7 @@ import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserServ
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
@@ -25,34 +26,52 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
     @Override
     @Transactional
     public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
-        OAuth2UserService<OAuth2UserRequest, OAuth2User> delegate = new DefaultOAuth2UserService();
-        OAuth2User oAuth2User = delegate.loadUser(userRequest);
-
         String registrationId = userRequest.getClientRegistration().getRegistrationId();
-        String userNameAttributeName = userRequest.getClientRegistration()
-                .getProviderDetails().getUserInfoEndpoint().getUserNameAttributeName();
 
-        Map<String, Object> attributes = oAuth2User.getAttributes();
-        OAuth2UserInfo userInfo = resolveUserInfo(registrationId, attributes);
-        Provider provider = Provider.valueOf(registrationId.toUpperCase());
+        // 1. 카카오/네이버 userInfo 엔드포인트 호출 (네트워크/토큰 문제 시 여기서 실패)
+        OAuth2User oAuth2User;
+        try {
+            oAuth2User = new DefaultOAuth2UserService().loadUser(userRequest);
+        } catch (OAuth2AuthenticationException e) {
+            log.error("OAuth2 userInfo 조회 실패: provider={}, error={}", registrationId, e.getError(), e);
+            throw e;
+        }
 
-        // 신규 유저면 저장, 기존 유저면 조회
-        User user = userRepository.findBySocialIdAndProvider(userInfo.getSocialId(), provider)
-                .orElseGet(() -> {
-                    log.info("신규 OAuth2 유저 저장: provider={}, socialId={}", provider, userInfo.getSocialId());
-                    return userRepository.save(User.builder()
-                            .socialId(userInfo.getSocialId())
-                            .provider(provider)
-                            .email(userInfo.getEmail())
-                            .nickname(userInfo.getNickname())
-                            .build());
-                });
+        // 2. 응답 파싱 + 유저 저장/조회 (파싱·DB 문제 시 OAuth2AuthenticationException으로 변환해 실패 핸들러로 전달)
+        try {
+            String userNameAttributeName = userRequest.getClientRegistration()
+                    .getProviderDetails().getUserInfoEndpoint().getUserNameAttributeName();
 
-        // userId를 attribute에 담아서 성공 핸들러에서 꺼낼 수 있게 함
-        Map<String, Object> enriched = new java.util.HashMap<>(attributes);
-        enriched.put("userId", user.getId());
+            Map<String, Object> attributes = oAuth2User.getAttributes();
+            OAuth2UserInfo userInfo = resolveUserInfo(registrationId, attributes);
+            Provider provider = Provider.valueOf(registrationId.toUpperCase());
 
-        return new DefaultOAuth2User(Collections.emptyList(), enriched, userNameAttributeName);
+            // 신규 유저면 저장, 기존 유저면 조회
+            User user = userRepository.findBySocialIdAndProvider(userInfo.getSocialId(), provider)
+                    .orElseGet(() -> {
+                        log.info("신규 OAuth2 유저 저장: provider={}, socialId={}", provider, userInfo.getSocialId());
+                        return userRepository.save(User.builder()
+                                .socialId(userInfo.getSocialId())
+                                .provider(provider)
+                                .email(userInfo.getEmail())
+                                .nickname(userInfo.getNickname())
+                                .build());
+                    });
+
+            log.info("OAuth2 인증 완료: provider={}, userId={}", provider, user.getId());
+
+            // userId를 attribute에 담아서 성공 핸들러에서 꺼낼 수 있게 함
+            Map<String, Object> enriched = new java.util.HashMap<>(attributes);
+            enriched.put("userId", user.getId());
+
+            return new DefaultOAuth2User(Collections.emptyList(), enriched, userNameAttributeName);
+        } catch (OAuth2AuthenticationException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("OAuth2 유저 처리 실패: provider={}, message={}", registrationId, e.getMessage(), e);
+            throw new OAuth2AuthenticationException(
+                    new OAuth2Error("user_processing_failed", e.getMessage(), null), e);
+        }
     }
 
     private OAuth2UserInfo resolveUserInfo(String registrationId, Map<String, Object> attributes) {

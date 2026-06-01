@@ -34,6 +34,7 @@ public class ChatCompletionResponse {
 
     public String getContent() {
         if (choices == null || choices.isEmpty()) return "";
-        return choices.get(0).getMessage().getContent();
+        Message message = choices.get(0).getMessage();
+        return (message != null && message.getContent() != null) ? message.getContent() : "";
     }
 }

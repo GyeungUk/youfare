@@ -42,7 +42,8 @@ public class OpenAiClient {
                     .bodyToMono(ChatCompletionResponse.class)
                     .block();
 
-            return response != null ? response.getContent() : "응답을 받지 못했습니다.";
+            String content = response != null ? response.getContent() : "";
+            return (content != null && !content.isBlank()) ? content : "응답을 받지 못했습니다.";
 
         } catch (Exception e) {
             log.error("OpenAI API 호출 실패: {}", e.getMessage());
