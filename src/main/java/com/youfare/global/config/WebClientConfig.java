@@ -36,6 +36,9 @@ public class WebClientConfig {
     public WebClient publicDataWebClient(@Value("${public-data.base-url}") String baseUrl) {
         return WebClient.builder()
                 .baseUrl(baseUrl)
+                .defaultHeader(HttpHeaders.USER_AGENT,
+                        "Mozilla/5.0 (compatible; YoufareBot/1.0)")
+                .defaultHeader(HttpHeaders.ACCEPT, "*/*")
                 .codecs(c -> c.defaultCodecs().maxInMemorySize(MAX_IN_MEMORY_SIZE))
                 .build();
     }

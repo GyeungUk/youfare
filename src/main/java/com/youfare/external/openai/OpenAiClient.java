@@ -2,31 +2,77 @@ package com.youfare.external.openai;
 
 import com.youfare.global.exception.BusinessException;
 import com.youfare.global.response.ErrorCode;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Component
 public class OpenAiClient {
 
+    // 한국어 답변에 섞여 나오는 한자(漢字)를 잡는다. \p{IsHan} = CJK 한자(Han) 스크립트 전체.
+    private static final Pattern HANJA = Pattern.compile("\\p{IsHan}");
+
+    // 한자가 감지됐을 때 시스템 프롬프트에 덧붙여 "한글로만 다시 써라"고 강하게 지시하는 문구.
+    private static final String HANGUL_ONLY_REINFORCE =
+            "\n\n[재작성 지시] 직전 답변에 한자(漢字)가 섞여 있었습니다. " +
+            "이번에는 한자를 단 한 글자도 쓰지 말고, 오직 한글·숫자·기본 문장부호만 사용해 같은 내용을 다시 작성하세요.";
+
     private final WebClient openAiWebClient;
     private final String model;
+    private final String apiKey;
+    private final double temperature;
+    private final double topP;
 
     // baseUrl·인증 헤더가 설정된 싱글톤 WebClient 빈을 주입받아 재사용 (매 요청 재생성 방지)
     public OpenAiClient(WebClient openAiWebClient,
-                        @Value("${openai.model}") String model) {
+                        @Value("${openai.model}") String model,
+                        @Value("${openai.api-key}") String apiKey,
+                        @Value("${openai.temperature:0.3}") double temperature,
+                        @Value("${openai.top-p:0.9}") double topP) {
         this.openAiWebClient = openAiWebClient;
         this.model = model;
+        this.apiKey = apiKey;
+        this.temperature = temperature;
+        this.topP = topP;
+    }
+
+    // 앱 기동 시점에 API 키 미설정을 한 번 경고해 "무슨 말을 해도 오류" 상황의 원인을 명확히 한다.
+    @PostConstruct
+    void warnIfKeyMissing() {
+        if (apiKey == null || apiKey.isBlank() || apiKey.startsWith("dummy")) {
+            log.warn("[OpenAI/Groq] API 키가 설정되지 않았습니다(현재 값: '{}'). " +
+                    "환경변수 GROQ_API_KEY에 실제 키(gsk_...)를 넣지 않으면 AI 상담이 항상 실패합니다.", apiKey);
+        }
     }
 
     public String chat(String systemPrompt, String userMessage) {
+        String answer = callOnce(systemPrompt, userMessage);
+
+        // Llama 계열은 한국어 답변에 한자를 섞는 일이 잦다. 감지되면 강화 지시로 1회만 재요청해
+        // 깨끗한 한글 답변을 얻는다(재요청 결과가 더 깔끔할 때만 교체, 무한 재시도는 하지 않음).
+        if (HANJA.matcher(answer).find()) {
+            log.warn("[OpenAI/Groq] 응답에 한자가 감지되어 한글 전용으로 1회 재요청합니다.");
+            String retried = callOnce(systemPrompt + HANGUL_ONLY_REINFORCE, userMessage);
+            if (!HANJA.matcher(retried).find()) {
+                answer = retried;
+            }
+        }
+        return answer;
+    }
+
+    private String callOnce(String systemPrompt, String userMessage) {
         ChatCompletionRequest request = ChatCompletionRequest.builder()
                 .model(model)
                 .maxTokens(1000)
+                .temperature(temperature)
+                .topP(topP)
                 .messages(List.of(
                         ChatCompletionRequest.Message.builder().role("system").content(systemPrompt).build(),
                         ChatCompletionRequest.Message.builder().role("user").content(userMessage).build()
@@ -45,8 +91,13 @@ public class OpenAiClient {
             String content = response != null ? response.getContent() : "";
             return (content != null && !content.isBlank()) ? content : "응답을 받지 못했습니다.";
 
+        } catch (WebClientResponseException e) {
+            // 실제 HTTP 상태코드와 응답 본문을 남겨야 401(키 오류)·400(모델명 오류) 등을 구분할 수 있다.
+            log.error("OpenAI API 호출 실패: status={}, body={}",
+                    e.getStatusCode(), e.getResponseBodyAsString());
+            throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
         } catch (Exception e) {
-            log.error("OpenAI API 호출 실패: {}", e.getMessage());
+            log.error("OpenAI API 호출 실패: {}", e.getMessage(), e);
             throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
         }
     }

@@ -21,33 +21,49 @@ const catColor = {
 
 const catLabel = (v) => categories.find((c) => c.value === v)?.label ?? v
 
-export function WelfareCard({ item, onClick }) {
-  const dday = item.applyEndDate
-    ? Math.ceil((new Date(item.applyEndDate) - new Date()) / 86400000)
-    : null
+const statuses = [
+  { value: '', label: '전체' },
+  { value: 'ONGOING', label: '진행중' },
+  { value: 'UPCOMING', label: '예정' },
+  { value: 'CLOSED', label: '마감' },
+]
 
+// 카드 우측 상단 상태 뱃지. 진행중이고 마감 임박(D-7 이내)이면 빨간 D-day로 강조.
+function StatusBadge({ status, dDay }) {
+  if (status === 'ONGOING' && dDay != null && dDay <= 7) {
+    return (
+      <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-red-50 text-red-500 ring-1 ring-red-100">
+        {dDay <= 0 ? '오늘 마감' : `D-${dDay}`}
+      </span>
+    )
+  }
+  const style = {
+    ONGOING: 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100',
+    UPCOMING: 'bg-sky-50 text-sky-600 ring-1 ring-sky-100',
+    CLOSED: 'bg-slate-100 text-slate-400',
+  }
+  const label = { ONGOING: '진행중', UPCOMING: '예정', CLOSED: '마감' }
+  if (!style[status]) return null
+  return (
+    <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${style[status]}`}>
+      {label[status]}
+    </span>
+  )
+}
+
+export function WelfareCard({ item, onClick }) {
   return (
     <div
       onClick={onClick}
-      className="lift group bg-white rounded-3xl ring-1 ring-slate-100 p-6 hover:ring-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 cursor-pointer"
+      className={`lift group bg-white rounded-3xl ring-1 ring-slate-100 p-6 hover:ring-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 cursor-pointer ${
+        item.status === 'CLOSED' ? 'opacity-70' : ''
+      }`}
     >
       <div className="flex items-start justify-between gap-3 mb-4">
         <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${catColor[item.category] ?? catColor.ETC}`}>
           {catLabel(item.category)}
         </span>
-        {dday !== null && (
-          <span
-            className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
-              dday <= 0
-                ? 'bg-slate-100 text-slate-400'
-                : dday <= 7
-                ? 'bg-red-50 text-red-500 ring-1 ring-red-100'
-                : 'bg-slate-50 text-slate-500'
-            }`}
-          >
-            {dday <= 0 ? '마감' : `D-${dday}`}
-          </span>
-        )}
+        <StatusBadge status={item.status} dDay={item.dDay} />
       </div>
       <h3 className="font-bold text-slate-900 text-lg mb-2 line-clamp-2 group-hover:text-emerald-700 transition-colors">
         {item.title}
@@ -81,15 +97,17 @@ export default function WelfareListPage() {
   const navigate = useNavigate()
   const [items, setItems] = useState([])
   const [category, setCategory] = useState('')
+  const [status, setStatus] = useState('')
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
 
-  async function load(cat, p) {
+  async function load(cat, st, p) {
     setLoading(true)
     try {
       const params = { page: p, size: 9 }
       if (cat) params.category = cat
+      if (st) params.status = st
       const res = await api.get('/welfare', { params })
       setItems(res.data.data.content)
       setTotalPages(res.data.data.totalPages)
@@ -100,10 +118,15 @@ export default function WelfareListPage() {
     }
   }
 
-  useEffect(() => { load(category, page) }, [category, page])
+  useEffect(() => { load(category, status, page) }, [category, status, page])
 
   function changeCategory(cat) {
     setCategory(cat)
+    setPage(0)
+  }
+
+  function changeStatus(st) {
+    setStatus(st)
     setPage(0)
   }
 
@@ -135,6 +158,22 @@ export default function WelfareListPage() {
           >
             <span>{c.icon}</span>
             {c.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex gap-2 mb-7 flex-wrap">
+        {statuses.map((s) => (
+          <button
+            key={s.value}
+            onClick={() => changeStatus(s.value)}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+              status === s.value
+                ? 'bg-slate-800 text-white shadow-sm'
+                : 'bg-white text-slate-500 ring-1 ring-slate-200 hover:ring-slate-300'
+            }`}
+          >
+            {s.label}
           </button>
         ))}
       </div>

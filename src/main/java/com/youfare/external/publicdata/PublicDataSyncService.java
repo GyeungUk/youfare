@@ -48,7 +48,7 @@ public class PublicDataSyncService {
                     welfareUpsertService.upsertOne(item); // 단건 독립 트랜잭션
                     totalSaved++;
                 } catch (Exception e) {
-                    log.error("복지 항목 저장 실패: externalId={}, error={}", item.getServId(), e.getMessage());
+                    log.error("복지 항목 저장 실패: plcyNo={}, error={}", item.getPlcyNo(), e.getMessage());
                 }
             }
 

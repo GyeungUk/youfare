@@ -1,12 +1,17 @@
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { BACKEND_BASE } from '../api/axios'
 
 export default function LoginPage() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const hasError = params.get('error') != null
+  const redirect = params.get('redirect')
 
   function loginWith(provider) {
-    window.location.href = `http://localhost:8080/oauth2/authorization/${provider}`
+    // OAuth 왕복 동안 쿼리 파라미터가 사라지므로, 로그인 후 돌아갈 경로를 잠시 저장해 둔다.
+    // (콜백 페이지에서 꺼내 사용)
+    if (redirect) localStorage.setItem('postLoginRedirect', redirect)
+    window.location.href = `${BACKEND_BASE}/oauth2/authorization/${provider}`
   }
 
   return (

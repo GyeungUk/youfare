@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
+import LoginRequired from '../components/LoginRequired'
 
 const catMeta = {
   HOUSING: { label: '주거', color: 'bg-sky-50 text-sky-600' },
@@ -12,6 +13,7 @@ const catMeta = {
 
 export default function ScrapPage() {
   const navigate = useNavigate()
+  const isAuthed = !!localStorage.getItem('token')
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -35,7 +37,14 @@ export default function ScrapPage() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    // 게스트는 스크랩 API(로그인 필요)를 호출하지 않고 로그인 안내만 보여준다.
+    if (!isAuthed) {
+      setLoading(false)
+      return
+    }
+    load()
+  }, [isAuthed])
 
   return (
     <div>
@@ -44,7 +53,13 @@ export default function ScrapPage() {
         <p className="text-slate-500 mt-1.5">저장한 복지 혜택 목록이에요</p>
       </div>
 
-      {loading ? (
+      {!isAuthed ? (
+        <LoginRequired
+          icon="📌"
+          title="로그인하고 스크랩 이용하기"
+          desc={'관심 있는 복지 혜택을 저장하고 모아보려면\n로그인이 필요해요.'}
+        />
+      ) : loading ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="skeleton rounded-2xl h-24" />

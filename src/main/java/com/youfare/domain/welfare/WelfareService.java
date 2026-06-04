@@ -18,9 +18,12 @@ public class WelfareService {
 
     private final WelfareRepository welfareRepository;
 
-    /** 전체 목록 조회 (카테고리/지역 필터 + 페이징) */
-    public Page<WelfareResponse> getList(WelfareCategory category, String region, Pageable pageable) {
-        return welfareRepository.findByFilter(category, region, pageable)
+    /** 전체 목록 조회 (카테고리/지역/상태 필터 + 페이징) */
+    public Page<WelfareResponse> getList(WelfareCategory category, String region,
+                                         WelfareStatus status, Pageable pageable) {
+        String categoryName = (category != null) ? category.name() : null;
+        String statusName = (status != null) ? status.name() : null;
+        return welfareRepository.findByFilter(categoryName, region, statusName, LocalDate.now(), pageable)
                 .map(WelfareResponse::from);
     }
 

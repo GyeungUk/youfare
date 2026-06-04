@@ -21,13 +21,14 @@ public class WelfareController {
 
     private final WelfareService welfareService;
 
-    @Operation(summary = "복지 목록 조회", description = "카테고리/지역 필터 + 페이징")
+    @Operation(summary = "복지 목록 조회", description = "카테고리/지역/상태(진행중·마감·예정) 필터 + 페이징")
     @GetMapping
     public ResponseEntity<ApiResponse<Page<WelfareResponse>>> getList(
             @RequestParam(required = false) WelfareCategory category,
             @RequestParam(required = false) String region,
+            @RequestParam(required = false) WelfareStatus status,
             @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.ok(welfareService.getList(category, region, pageable)));
+        return ResponseEntity.ok(ApiResponse.ok(welfareService.getList(category, region, status, pageable)));
     }
 
     @Operation(summary = "개인화 추천", description = "로그인 유저 프로필 기반 맞춤 혜택 (신청 가능 + 조건 부합)")

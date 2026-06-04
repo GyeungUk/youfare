@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import api from '../api/axios'
 
 export default function OAuthCallback() {
   const [params] = useSearchParams()
@@ -7,12 +8,24 @@ export default function OAuthCallback() {
 
   useEffect(() => {
     const token = params.get('token')
-    if (token) {
-      localStorage.setItem('token', token)
-      navigate('/onboarding', { replace: true })
-    } else {
+    if (!token) {
       navigate('/login', { replace: true })
+      return
     }
+    localStorage.setItem('token', token)
+
+    // 게스트 상태에서 로그인 전용 메뉴를 누르고 들어왔다면, 로그인 후 그 경로로 돌려보낸다.
+    const redirect = localStorage.getItem('postLoginRedirect')
+    localStorage.removeItem('postLoginRedirect')
+
+    // 이미 온보딩(생년 등 프로필 입력)을 마친 유저는 매번 온보딩을 다시 거치지 않고
+    // 원래 가려던 곳(없으면 복지 목록)으로 보낸다. 신규/미완료 유저만 온보딩으로 안내.
+    api.get('/users/me')
+      .then((r) => {
+        const onboarded = r.data?.data?.birthYear != null
+        navigate(onboarded ? (redirect || '/welfare') : '/onboarding', { replace: true })
+      })
+      .catch(() => navigate('/onboarding', { replace: true }))
   }, [])
 
   return (

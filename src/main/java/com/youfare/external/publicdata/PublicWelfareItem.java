@@ -6,41 +6,58 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * 공공데이터포털 청년정책 API 응답 단건 항목
- * 실제 API 필드명에 맞게 @JsonProperty로 매핑
+ * 온통청년(youthcenter.go.kr) 청년정책 API(getPlcy) 응답 단건 항목
  */
 @Getter
 @NoArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class PublicWelfareItem {
 
-    @JsonProperty("servId")
-    private String servId;           // 서비스 ID (externalId)
+    @JsonProperty("plcyNo")
+    private String plcyNo;           // 정책 번호 (externalId)
 
-    @JsonProperty("servNm")
-    private String servNm;           // 서비스명 (title)
+    @JsonProperty("plcyNm")
+    private String plcyNm;           // 정책명 (title)
 
-    @JsonProperty("servDgst")
-    private String servDgst;         // 서비스 요약 (description)
+    @JsonProperty("plcyExplnCn")
+    private String plcyExplnCn;      // 정책 설명 (description)
 
-    @JsonProperty("lifeNmArray")
-    private String lifeNmArray;      // 생애주기 (카테고리 분류에 활용)
+    @JsonProperty("plcySprtCn")
+    private String plcySprtCn;       // 정책 지원 내용
 
-    @JsonProperty("tgtrDtlCn")
-    private String tgtrDtlCn;        // 지원대상 상세내용
+    @JsonProperty("lclsfNm")
+    private String lclsfNm;          // 정책 대분류명 (예: 일자리, 주거, 교육･직업훈련, 금융･복지･문화, 참여･기반)
 
-    @JsonProperty("alwServCn")
-    private String alwServCn;        // 소득조건
+    @JsonProperty("mclsfNm")
+    private String mclsfNm;          // 정책 중분류명
+
+    @JsonProperty("sprvsnInstCdNm")
+    private String sprvsnInstCdNm;   // 주관기관명
+
+    @JsonProperty("earnCndSeCd")
+    private String earnCndSeCd;      // 소득 조건 구분 코드
+
+    @JsonProperty("earnEtcCn")
+    private String earnEtcCn;        // 소득 조건 기타 설명
+
+    @JsonProperty("earnMinAmt")
+    private String earnMinAmt;       // 연소득 기준 최소 금액(만원). earnCndSeCd=0043002일 때 의미 있음
+
+    @JsonProperty("earnMaxAmt")
+    private String earnMaxAmt;       // 연소득 기준 최대 금액(만원). earnCndSeCd=0043002일 때 의미 있음
+
+    @JsonProperty("sprtTrgtMinAge")
+    private Integer sprtTrgtMinAge;  // 지원 대상 최소 연령
+
+    @JsonProperty("sprtTrgtMaxAge")
+    private Integer sprtTrgtMaxAge;  // 지원 대상 최대 연령
 
     @JsonProperty("aplyYmd")
-    private String aplyYmd;          // 신청시작일 (yyyyMMdd)
+    private String aplyYmd;          // 신청 기간 (예: "20251222 ~ 20261211")
 
-    @JsonProperty("aplyEndYmd")
-    private String aplyEndYmd;       // 신청종료일 (yyyyMMdd)
+    @JsonProperty("aplyUrlAddr")
+    private String aplyUrlAddr;      // 신청 URL
 
-    @JsonProperty("inqplCtadrUrl")
-    private String inqplCtadrUrl;    // 원본링크
-
-    @JsonProperty("rprsCtadr")
-    private String rprsCtadr;        // 지역 (시도명)
+    @JsonProperty("refUrlAddr1")
+    private String refUrlAddr1;      // 참고 사이트 URL
 }

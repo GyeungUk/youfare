@@ -40,38 +40,70 @@ public class PersonalizedPromptBuilder {
 
     public String build(User user) {
         int age = calculateAge(user);
-        String region = user.getRegion() != null ? user.getRegion() : "미설정";
-        String income = user.getIncomeBracket() != null ? user.getIncomeBracket().name() : "UNKNOWN";
-        String employment = user.getEmploymentStatus() != null ? user.getEmploymentStatus().name() : "미설정";
+
+        // 프로필 미입력 항목은 프롬프트에서 아예 빼서, AI가 "정보가 없어 답을 못 한다"고
+        // 회피하지 않도록 한다. (예전엔 '나이: 0세 / 미설정'이 주입돼 AI가 질문을 거부했음)
+        StringBuilder profile = new StringBuilder();
+        if (age > 0)                              profile.append("- 나이: ").append(age).append("세\n");
+        if (user.getRegion() != null)             profile.append("- 거주지역: ").append(user.getRegion()).append("\n");
+        if (user.getIncomeBracket() != null)      profile.append("- 소득구간: ").append(user.getIncomeBracket().name()).append("\n");
+        if (user.getEmploymentStatus() != null)   profile.append("- 취업상태: ").append(user.getEmploymentStatus().name()).append("\n");
+
+        boolean hasProfile = profile.length() > 0;
+        String profileSection = hasProfile
+                ? profile.toString().stripTrailing()
+                : "- (아직 입력된 프로필 정보가 없습니다)";
 
         // DB에서 이 유저 조건에 맞는 상위 5개 혜택 조회
-        String welfareSummary = buildWelfareSummary(user, age);
+        String welfareSummary = buildWelfareSummary(age, user.getRegion());
 
-        return String.format("""
-                당신은 청년 복지·금융 상담 도우미 'Youfare'입니다.
-                
-                [현재 상담 사용자 프로필]
-                - 나이: %d세
-                - 거주지역: %s
-                - 소득구간: %s
-                - 취업상태: %s
-                
-                [현재 신청 가능한 맞춤 혜택 (상위 5건)]
-                %s
-                
-                위 맥락에 근거하여 사용자의 질문에 답변해 주세요.
-                - 답변은 친절하고 이해하기 쉽게 작성하세요.
-                - 위 혜택 목록을 적극 활용하되, 목록에 없는 내용은 "공식 기관 확인을 권장한다"고 안내하세요.
-                - 반드시 답변 마지막에 다음 면책 고지를 포함하세요:
-                  "※ 본 답변은 참고용 정보이며, 정확한 내용과 신청 조건은 해당 기관 공식 채널에서 반드시 확인하시기 바랍니다."
-                """,
-                age, region, income, employment, welfareSummary);
+        return compose(profileSection, welfareSummary);
     }
 
-    private String buildWelfareSummary(User user, int age) {
+    /**
+     * 비로그인(게스트) 상담용 프롬프트.
+     * 프로필이 없으므로 개인화 대신 '현재 신청 가능한 일반 혜택' 상위 5건을 컨텍스트로 주입한다.
+     * (나이·지역 필터 없이 조회 → age/region = null)
+     */
+    public String buildAnonymous() {
+        String profileSection = "- (비로그인 상태입니다. 로그인 후 나이·지역·소득·취업상태를 입력하면 맞춤 추천을 받을 수 있어요)";
+        String welfareSummary = buildWelfareSummary(null, null);
+        return compose(profileSection, welfareSummary);
+    }
+
+    private String compose(String profileSection, String welfareSummary) {
+        return String.format("""
+                당신은 청년 복지·금융 상담 도우미 'Youfare'입니다.
+
+                [가장 중요한 규칙 — 무조건 지킬 것]
+                1. 답변은 오직 한국어(한글)로만 작성합니다. 한자(漢字)나 중국어·일본어·영어 단어를
+                   절대 섞지 마세요. (예: '答案'→'답변', '本'→'이/본', '申請'→'신청'처럼 반드시 한글로)
+                   사람 이름·기관명 같은 고유명사가 아니면 한글 외 문자는 한 글자도 쓰지 마세요.
+                2. 먼저 사용자의 질문 의도를 정확히 파악한 뒤, 그 질문에 직접 답하세요.
+                   질문과 동떨어진 일반론만 늘어놓지 말고, 무엇을 묻는지부터 짚고 시작하세요.
+
+                [현재 상담 사용자 프로필]
+                %s
+
+                [현재 신청 가능한 맞춤 혜택 (DB 조회 결과)]
+                %s
+
+                [답변 지침]
+                - 위 맞춤 혜택 목록이 있으면 적극 활용해 구체적으로 안내하세요.
+                - 혜택 목록이 비어 있거나 프로필 정보가 부족하더라도, 절대 "정보가 없어 답할 수 없다"고 회피하지 마세요.
+                  대신 청년 복지·금융에 대한 일반적인 지식으로 최대한 도움이 되는 답을 제공하세요.
+                - 프로필 정보가 비어 있다면, 답변 끝에 "온보딩에서 나이·지역·소득·취업상태를 입력하면 더 정확한 맞춤 추천을 받을 수 있어요"라고 한 줄 안내만 덧붙이세요(질문 거부 금지).
+                - 목록에 없는 구체적 신청 조건·금액은 "공식 기관 확인을 권장한다"고 안내하세요.
+                - 면책 고지 문구는 시스템이 자동으로 덧붙이니, 답변에 직접 쓰지 마세요.
+                """,
+                profileSection, welfareSummary);
+    }
+
+    // age/region 이 null 이면 해당 필터를 건너뛰고 일반 혜택을 조회한다(게스트 상담용).
+    private String buildWelfareSummary(Integer age, String region) {
         try {
             List<Welfare> list = welfareRepository
-                    .findPersonalized(age, user.getRegion(), LocalDate.now(), PageRequest.of(0, 5))
+                    .findPersonalized(age, region, LocalDate.now(), PageRequest.of(0, 5))
                     .getContent();
 
             if (list.isEmpty()) return "- 현재 조건에 맞는 혜택 정보가 없습니다.";
@@ -81,7 +113,7 @@ public class PersonalizedPromptBuilder {
                             w.getCategory() != null ? w.getCategory().name() : "ETC",
                             w.getTitle(),
                             w.getDescription() != null
-                                    ? w.getDescription().substring(0, Math.min(80, w.getDescription().length())) + "..."
+                                    ? w.getDescription().substring(0, Math.min(160, w.getDescription().length())) + "..."
                                     : "상세 정보 없음"))
                     .collect(Collectors.joining("\n"));
         } catch (Exception e) {

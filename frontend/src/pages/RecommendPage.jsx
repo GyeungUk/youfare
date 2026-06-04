@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { WelfareCard } from './WelfareListPage'
+import LoginRequired from '../components/LoginRequired'
 
 function CardSkeleton() {
   return (
@@ -16,15 +17,21 @@ function CardSkeleton() {
 
 export default function RecommendPage() {
   const navigate = useNavigate()
+  const isAuthed = !!localStorage.getItem('token')
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // 게스트는 추천 API(로그인 필요)를 호출하지 않고 로그인 안내만 보여준다.
+    if (!isAuthed) {
+      setLoading(false)
+      return
+    }
     api.get('/welfare/recommend')
       .then((r) => setItems(r.data.data.content))
       .catch(() => setItems([]))
       .finally(() => setLoading(false))
-  }, [])
+  }, [isAuthed])
 
   return (
     <div>
@@ -33,7 +40,13 @@ export default function RecommendPage() {
         <p className="text-slate-500 mt-1.5">내 프로필에 맞는 혜택만 골라드렸어요</p>
       </div>
 
-      {loading ? (
+      {!isAuthed ? (
+        <LoginRequired
+          icon="🎯"
+          title="로그인하고 맞춤 추천 받기"
+          desc={'나이·지역·상황에 맞는 혜택만 골라드려요.\n로그인하면 바로 확인할 수 있어요.'}
+        />
+      ) : loading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)}
         </div>

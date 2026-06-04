@@ -39,3 +39,10 @@ out/
 ### Frontend ###
 frontend/node_modules/
 frontend/dist/
+
+### Env / Secrets ###
+.env
+!.env.example
+
+### Claude Code ###
+.claude/

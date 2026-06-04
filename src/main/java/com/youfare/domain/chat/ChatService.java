@@ -23,20 +23,27 @@ public class ChatService {
 
     @Transactional
     public ChatResponse chat(Long userId, ChatRequest request) {
-        User user = userRepository.findByIdWithLock(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        // 비로그인(게스트)은 userId == null — 프로필 없이 일반 상담 모드로 동작한다.
+        User user = (userId != null)
+                ? userRepository.findByIdWithLock(userId)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND))
+                : null;
 
-        // 개인화 시스템 프롬프트 생성
-        String systemPrompt = promptBuilder.build(user);
+        // 개인화 시스템 프롬프트 생성 (로그인 → 프로필 기반 / 게스트 → 일반)
+        String systemPrompt = (user != null) ? promptBuilder.build(user) : promptBuilder.buildAnonymous();
 
         // OpenAI API 호출
         String answer = openAiClient.chat(systemPrompt, request.getMessage());
 
-        // 챗봇 사용 포인트 적립 (+1)
-        user.addPoint(PointPolicy.CHAT_USE);
+        // 면책 고지는 AI가 생성하면 한자가 섞이거나 누락될 수 있어, 항상 고정 문구를 코드에서 덧붙인다.
+        // (프론트는 answer만 렌더링하므로 본문에 합쳐 노출하고, disclaimer 필드는 API 호환용으로 함께 반환)
+        String answerWithDisclaimer = answer + "\n\n" + DISCLAIMER;
+
+        // 챗봇 사용 포인트 적립 (+1) — 로그인 유저만 (게스트는 적립 대상 없음)
+        if (user != null) user.addPoint(PointPolicy.CHAT_USE);
 
         return ChatResponse.builder()
-                .answer(answer)
+                .answer(answerWithDisclaimer)
                 .disclaimer(DISCLAIMER)
                 .build();
     }

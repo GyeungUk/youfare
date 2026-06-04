@@ -20,6 +20,10 @@ public enum ErrorCode {
     // Welfare
     WELFARE_NOT_FOUND(HttpStatus.NOT_FOUND, "W001", "복지 혜택을 찾을 수 없습니다."),
 
+    // Chat
+    GUEST_CHAT_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "CH001",
+            "비로그인 상태에서는 AI 상담 횟수가 제한돼요. 로그인하면 계속 이용할 수 있어요."),
+
     // Scrap
     ALREADY_SCRAPPED(HttpStatus.CONFLICT, "S001", "이미 스크랩한 혜택입니다."),
     SCRAP_NOT_FOUND(HttpStatus.NOT_FOUND, "S002", "스크랩을 찾을 수 없습니다."),

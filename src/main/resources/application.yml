@@ -1,3 +1,10 @@
+server:
+  # Render/Railway 등 PaaS는 PORT 환경변수로 바인딩 포트를 주입한다. 없으면 8080.
+  port: ${PORT:8080}
+  # 리버스 프록시(HTTPS 종단) 뒤에서 X-Forwarded-* 헤더를 신뢰해
+  # OAuth redirect_uri의 {baseUrl}이 http가 아닌 실제 https 도메인으로 생성되게 한다.
+  forward-headers-strategy: framework
+
 spring:
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:youfare}
@@ -7,11 +14,12 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    # 운영에선 SQL 로그가 과도해 기본 false. 개발 시 JPA_SHOW_SQL=true 로 켠다.
+    show-sql: ${JPA_SHOW_SQL:false}
     properties:
       hibernate:
-        format_sql: true
+        format_sql: ${JPA_SHOW_SQL:false}
         dialect: org.hibernate.dialect.PostgreSQLDialect
     open-in-view: false
 
@@ -20,9 +28,10 @@ spring:
       client:
         registration:
           kakao:
-            client-id: ${KAKAO_CLIENT_ID:c140ef432f0f21aa4ae23ce23f639304}
-            client-secret: ${KAKAO_CLIENT_SECRET:C5TmDbpZOtSDbIExS0Q2MwVqSJ3Dbg6s}
-            redirect-uri: "{baseUrl}/login/oauth2/code/kakao"
+            client-id: ${KAKAO_CLIENT_ID}
+            client-secret: ${KAKAO_CLIENT_SECRET}
+            # 기본은 {baseUrl}(요청 호스트 기준). 터널/배포 시 KAKAO_REDIRECT_URI로 외부 https 주소를 강제 지정한다.
+            redirect-uri: "${KAKAO_REDIRECT_URI:{baseUrl}/login/oauth2/code/kakao}"
             authorization-grant-type: authorization_code
             client-authentication-method: client_secret_post
             # scope 미지정: 카카오 콘솔 동의항목 설정과 무관하게 로그인 보장 (유저 식별용 id만 사용).
@@ -30,9 +39,9 @@ spring:
             #   scope:
             #     - profile_nickname
           naver:
-            client-id: ${NAVER_CLIENT_ID:dummy-naver-client-id}
-            client-secret: ${NAVER_CLIENT_SECRET:dummy-naver-client-secret}
-            redirect-uri: "{baseUrl}/login/oauth2/code/naver"
+            client-id: ${NAVER_CLIENT_ID}
+            client-secret: ${NAVER_CLIENT_SECRET}
+            redirect-uri: "${NAVER_REDIRECT_URI:{baseUrl}/login/oauth2/code/naver}"
             authorization-grant-type: authorization_code
             scope:
               - name
@@ -53,17 +62,27 @@ frontend:
   url: ${FRONTEND_URL:http://localhost:5173}
 
 jwt:
-  secret: ${JWT_SECRET:youfare-local-dev-jwt-secret-key-minimum-32chars}
+  secret: ${JWT_SECRET}
   expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
 public-data:
-  api-key: ${PUBLIC_DATA_API_KEY:dummy-public-data-api-key}
-  base-url: ${PUBLIC_DATA_BASE_URL:https://www.bokjiro.go.kr/ssis-tbu/twataa/wlfareInfo/moveTWAT52011M.do}
+  api-key: ${PUBLIC_DATA_API_KEY}
+  base-url: ${PUBLIC_DATA_BASE_URL:https://www.youthcenter.go.kr/go/ythip/getPlcy}
 
+# Groq는 OpenAI 호환 API라 엔드포인트/요청·응답 포맷이 동일해 기존 OpenAiClient 코드를 그대로 사용한다.
+# 무료 키 발급: https://console.groq.com/keys  (gsk_ 로 시작)
 openai:
-  api-key: ${OPENAI_API_KEY:dummy-openai-api-key}
-  base-url: https://api.openai.com/v1
-  model: ${OPENAI_MODEL:gpt-4o-mini}
+  api-key: ${GROQ_API_KEY}
+  base-url: ${OPENAI_BASE_URL:https://api.groq.com/openai/v1}
+  model: ${OPENAI_MODEL:llama-3.3-70b-versatile}
+  # temperature를 낮추면 답변이 결정적·집중적이 되어 Llama의 한자 섞임과 산만함이 크게 줄어든다.
+  temperature: ${OPENAI_TEMPERATURE:0.3}
+  top-p: ${OPENAI_TOP_P:0.9}
+
+# AI 상담 정책
+chat:
+  # 비로그인(게스트) 1일 AI 상담 허용 횟수 (IP 기준). 로그인 유저는 제한 없음.
+  guest-daily-limit: ${CHAT_GUEST_DAILY_LIMIT:5}
 
 springdoc:
   swagger-ui:

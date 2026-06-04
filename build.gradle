@@ -43,6 +43,9 @@ dependencies {
     // Swagger / springdoc-openapi
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
 
+    // .env 자동 로드 (Spring 기본은 .env를 읽지 않으므로, application.yml의 ${ENV} 자리표시자를 .env로 채워줌)
+    implementation 'me.paulschwarz:spring-dotenv:4.0.0'
+
     // Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
