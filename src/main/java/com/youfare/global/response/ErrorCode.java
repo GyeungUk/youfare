@@ -17,6 +17,20 @@ public enum ErrorCode {
     // User
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "U001", "사용자를 찾을 수 없습니다."),
 
+    // Auth
+    EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "A001", "이미 가입된 이메일입니다."),
+    LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "A002", "이메일 또는 비밀번호가 올바르지 않습니다."),
+    PHONE_ALREADY_EXISTS(HttpStatus.CONFLICT, "A003", "이미 가입된 전화번호입니다."),
+    TERMS_NOT_AGREED(HttpStatus.BAD_REQUEST, "A004", "필수 약관에 동의해야 가입할 수 있습니다."),
+    ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "A005", "해당 정보로 가입된 계정을 찾을 수 없습니다."),
+
+    // Phone verification
+    PHONE_CODE_NOT_FOUND(HttpStatus.BAD_REQUEST, "PV001", "인증 요청 내역이 없습니다. 인증번호를 다시 요청해주세요."),
+    PHONE_CODE_EXPIRED(HttpStatus.BAD_REQUEST, "PV002", "인증번호가 만료되었습니다. 다시 요청해주세요."),
+    PHONE_CODE_MISMATCH(HttpStatus.BAD_REQUEST, "PV003", "인증번호가 올바르지 않습니다."),
+    PHONE_CODE_TOO_MANY_ATTEMPTS(HttpStatus.TOO_MANY_REQUESTS, "PV004", "인증 시도 횟수를 초과했습니다. 다시 요청해주세요."),
+    PHONE_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "PV005", "전화번호 인증이 필요합니다."),
+
     // Welfare
     WELFARE_NOT_FOUND(HttpStatus.NOT_FOUND, "W001", "복지 혜택을 찾을 수 없습니다."),
 

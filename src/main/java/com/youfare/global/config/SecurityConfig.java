@@ -5,6 +5,7 @@ import com.youfare.global.jwt.JwtAuthenticationFilter;
 import com.youfare.global.jwt.JwtProvider;
 import com.youfare.global.jwt.RestAuthenticationEntryPoint;
 import com.youfare.global.oauth.CustomOAuth2UserService;
+import com.youfare.global.oauth.HttpCookieOAuth2AuthorizationRequestRepository;
 import com.youfare.global.oauth.OAuth2FailureHandler;
 import com.youfare.global.oauth.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,8 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -35,6 +38,7 @@ public class SecurityConfig {
     private final JwtProvider jwtProvider;
     private final UserRepository userRepository;
     private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
+    private final HttpCookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository;
 
     @Value("${frontend.url:http://localhost:5173}")
     private String frontendUrl;
@@ -83,6 +87,9 @@ public class SecurityConfig {
 
             // OAuth2 소셜 로그인 설정
             .oauth2Login(oauth -> oauth
+                // 인증요청(state)을 세션 대신 쿠키에 저장 — STATELESS 정책과 충돌 없이
+                // 카카오 왕복을 견뎌 "로그인이 한 번에 안 됨" 증상을 해결한다.
+                .authorizationEndpoint(ae -> ae.authorizationRequestRepository(cookieAuthorizationRequestRepository))
                 .userInfoEndpoint(ui -> ui.userService(customOAuth2UserService))
                 .successHandler(oAuth2SuccessHandler)
                 .failureHandler(oAuth2FailureHandler)
@@ -97,10 +104,24 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /** 폼 로그인 비밀번호 해싱용 BCrypt 인코더 */
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(frontendUrl));
+        // 배포 프론트(frontendUrl)에 더해 로컬 개발 origin(localhost/127.0.0.1 임의 포트)도 허용한다.
+        //   브라우저는 vite 프록시로 보내도 Origin 헤더(http://localhost:5173)를 그대로 전달하므로,
+        //   이 패턴이 없으면 개발 중 모든 /api 요청이 CORS 403으로 막힌다.
+        //   allowCredentials(true)와 함께 쓰려면 setAllowedOrigins가 아니라 패턴 API를 써야 한다.
+        config.setAllowedOriginPatterns(List.of(
+                frontendUrl,
+                "http://localhost:*",
+                "http://127.0.0.1:*"
+        ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

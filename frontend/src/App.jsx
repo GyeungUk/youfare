@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
+import SignupPage from './pages/SignupPage'
+import FindAccountPage from './pages/FindAccountPage'
 import OnboardingPage from './pages/OnboardingPage'
 import WelfareListPage from './pages/WelfareListPage'
 import WelfareDetailPage from './pages/WelfareDetailPage'
@@ -29,6 +31,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="/find-account" element={<FindAccountPage />} />
           <Route path="/oauth/callback" element={<OAuthCallback />} />
           <Route path="/onboarding" element={<PrivateRoute><OnboardingPage /></PrivateRoute>} />
           {/* Layout(헤더/네비)은 게스트도 공유 — 페이지별로 로그인 여부를 가른다 */}
