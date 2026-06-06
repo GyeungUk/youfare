@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../api/axios'
 
 const categories = [
@@ -95,11 +95,13 @@ function CardSkeleton() {
 
 export default function WelfareListPage() {
   const navigate = useNavigate()
+  // 섹터/상태/페이지를 URL 쿼리에 보관 → 상세에서 뒤로가기 시 보던 섹터로 복원된다.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const category = searchParams.get('category') || ''
+  const status = searchParams.get('status') || ''
+  const page = Number(searchParams.get('page')) || 0
   const [items, setItems] = useState([])
-  const [category, setCategory] = useState('')
-  const [status, setStatus] = useState('')
   const [loading, setLoading] = useState(true)
-  const [page, setPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
 
   async function load(cat, st, p) {
@@ -120,14 +122,25 @@ export default function WelfareListPage() {
 
   useEffect(() => { load(category, status, page) }, [category, status, page])
 
+  // replace:true → 필터 전환마다 히스토리가 쌓이지 않게 현재 항목을 갱신만 한다.
   function changeCategory(cat) {
-    setCategory(cat)
-    setPage(0)
+    const p = new URLSearchParams(searchParams)
+    if (cat) p.set('category', cat); else p.delete('category')
+    p.delete('page')
+    setSearchParams(p, { replace: true })
   }
 
   function changeStatus(st) {
-    setStatus(st)
-    setPage(0)
+    const p = new URLSearchParams(searchParams)
+    if (st) p.set('status', st); else p.delete('status')
+    p.delete('page')
+    setSearchParams(p, { replace: true })
+  }
+
+  function goPage(n) {
+    const p = new URLSearchParams(searchParams)
+    if (n) p.set('page', String(n)); else p.delete('page')
+    setSearchParams(p, { replace: true })
   }
 
   // 현재 페이지 주변만 노출 (최대 5개 윈도우)
@@ -200,7 +213,7 @@ export default function WelfareListPage() {
         <div className="flex justify-center items-center gap-1.5 mt-10">
           <button
             disabled={page === 0}
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            onClick={() => goPage(Math.max(0, page - 1))}
             className="w-9 h-9 rounded-xl text-slate-500 hover:bg-white disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
           >
             ←
@@ -208,7 +221,7 @@ export default function WelfareListPage() {
           {pageWindow.map((i) => (
             <button
               key={i}
-              onClick={() => setPage(i)}
+              onClick={() => goPage(i)}
               className={`w-9 h-9 rounded-xl text-sm font-semibold transition-all ${
                 page === i
                   ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/25'
@@ -220,7 +233,7 @@ export default function WelfareListPage() {
           ))}
           <button
             disabled={page >= totalPages - 1}
-            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            onClick={() => goPage(Math.min(totalPages - 1, page + 1))}
             className="w-9 h-9 rounded-xl text-slate-500 hover:bg-white disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
           >
             →

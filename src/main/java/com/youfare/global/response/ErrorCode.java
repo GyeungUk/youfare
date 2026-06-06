@@ -53,6 +53,11 @@ public enum ErrorCode {
     COMMENT_DEPTH_EXCEEDED(HttpStatus.BAD_REQUEST, "CM003", "대댓글에는 다시 답글을 달 수 없습니다. (답글은 2단계까지만 가능합니다)"),
     COMMENT_POST_MISMATCH(HttpStatus.BAD_REQUEST, "CM004", "부모 댓글이 해당 게시글의 댓글이 아닙니다."),
 
+    // File / Media upload
+    INVALID_MEDIA_UPLOAD(HttpStatus.BAD_REQUEST, "F001", "첨부 파일은 최대 10개, 각 20MB·총 50MB 이하로 업로드해 주세요."),
+    UNSUPPORTED_MEDIA_TYPE(HttpStatus.BAD_REQUEST, "F002", "지원하지 않는 형식입니다. 이미지(jpg·png·gif·webp)·동영상(mp4·webm)·문서(pdf·doc·docx·xls·xlsx·ppt·pptx·hwp·hwpx·txt·csv·zip)만 올릴 수 있어요."),
+    FILE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "F003", "파일 업로드에 실패했습니다. 잠시 후 다시 시도해주세요."),
+
     // External API
     EXTERNAL_API_ERROR(HttpStatus.BAD_GATEWAY, "E001", "외부 API 호출에 실패했습니다.");
 

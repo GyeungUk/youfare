@@ -32,12 +32,13 @@ public class WelfareService {
      *  - region, applyEndDate >= 오늘 조건
      *  - 프로필이 다른 두 유저는 다른 결과를 받게 됨
      */
-    public Page<WelfareResponse> getRecommended(User user, Pageable pageable) {
+    public Page<WelfareResponse> getRecommended(User user, WelfareCategory category, Pageable pageable) {
         Integer age = null;
         if (user.getBirthYear() != null) {
             age = LocalDate.now().getYear() - user.getBirthYear();
         }
-        return welfareRepository.findPersonalized(age, user.getRegion(), LocalDate.now(), pageable)
+        String categoryName = (category != null) ? category.name() : null;
+        return welfareRepository.findPersonalized(age, user.getRegion(), categoryName, LocalDate.now(), pageable)
                 .map(WelfareResponse::from);
     }
 

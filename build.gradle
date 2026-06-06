@@ -46,6 +46,12 @@ dependencies {
     // .env 자동 로드 (Spring 기본은 .env를 읽지 않으므로, application.yml의 ${ENV} 자리표시자를 .env로 채워줌)
     implementation 'me.paulschwarz:spring-dotenv:4.0.0'
 
+    // S3 호환 오브젝트 스토리지(AWS S3 / Cloudflare R2 / MinIO) — 배포용 이미지 저장.
+    // url-connection-client: JDK 내장 HTTP 클라이언트로, Netty/Apache 의존성 무게를 피한다.
+    implementation platform('software.amazon.awssdk:bom:2.28.16')
+    implementation 'software.amazon.awssdk:s3'
+    implementation 'software.amazon.awssdk:url-connection-client'
+
     // Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'

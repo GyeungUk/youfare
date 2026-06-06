@@ -38,17 +38,116 @@ const INITIAL = [
   },
 ]
 
-const suggestions = [
+// 주제별 추천 질문 풀. 사용자가 고른 질문의 "주제"를 인식해, 같은 주제의 더 깊은 질문을 이어서 추천한다.
+const TOPICS = {
+  housing: {
+    icon: '🏠',
+    keywords: ['주거', '월세', '전세', '집', '임대', '행복주택', '청약', '기숙사', '주택', '보증금'],
+    questions: [
+      '청년 월세 지원은 얼마나 받을 수 있어?',
+      '전세자금 대출(버팀목) 조건이 궁금해',
+      '행복주택 신청 자격과 방법 알려줘',
+      '청년 주거급여 분리지급이 뭐야?',
+      '청년 우대형 청약통장 혜택이 궁금해',
+    ],
+  },
+  job: {
+    icon: '💼',
+    keywords: ['취업', '일자리', '구직', '면접', '창업', '직업훈련', '인턴', '채용', '내일채움', '취준'],
+    questions: [
+      '국민취업지원제도로 뭘 받을 수 있어?',
+      '청년내일채움공제 조건이 궁금해',
+      '면접 정장·구직활동 지원도 있어?',
+      '청년 창업 지원금은 어떻게 신청해?',
+      'K-디지털 트레이닝 직업훈련 알려줘',
+    ],
+  },
+  finance: {
+    icon: '💰',
+    keywords: ['금융', '대출', '적금', '통장', '자산', '저축', '도약계좌', '희망적금', '햇살론', '소득', '목돈'],
+    questions: [
+      '청년도약계좌 가입 조건과 혜택 알려줘',
+      '도약계좌랑 희망적금은 뭐가 달라?',
+      '햇살론 유스 대출이 궁금해',
+      '내 소득이면 어떤 금융 혜택을 받을 수 있어?',
+      '청년 우대형 청약통장으로 목돈 모으는 법',
+    ],
+  },
+  education: {
+    icon: '🎓',
+    keywords: ['교육', '학자금', '장학', '학비', '자격증', '어학', '국가장학금', '내일배움', '등록금', '공부'],
+    questions: [
+      '국가장학금 신청 자격이 궁금해',
+      '내일배움카드로 뭘 배울 수 있어?',
+      '청년 어학·자격증 응시료 지원 있어?',
+      '학자금 대출 이자 지원도 받을 수 있어?',
+    ],
+  },
+  life: {
+    icon: '🌱',
+    keywords: ['건강', '심리', '상담', '의료', '문화', '교통', '복지', '바우처', '검진', '마음'],
+    questions: [
+      '청년 마음건강 심리상담 바우처 알려줘',
+      '청년 국가건강검진 대상도 되나요?',
+      '문화누리카드 같은 문화 지원이 궁금해',
+      '청년 대중교통비 지원(K-패스) 알려줘',
+    ],
+  },
+}
+
+// 처음 보여줄 추천 질문 (주거·취업·금융 한 개씩)
+const INITIAL_SUGGESTIONS = [
   '청년 주거 지원 혜택 알려줘',
   '취업 준비생이 받을 수 있는 혜택은?',
   '내 조건에 맞는 금융 혜택 뭐가 있어?',
 ]
+
+// 질문 텍스트에서 주제를 추론 (키워드 매칭). 못 찾으면 null.
+function topicOf(text) {
+  for (const [key, t] of Object.entries(TOPICS)) {
+    if (t.keywords.some((k) => text.includes(k))) return key
+  }
+  return null
+}
+
+function shuffle(arr) {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
+// 방금 한 질문(text)을 바탕으로 "이어서 물어볼" 새 추천 질문 3개를 만든다.
+// asked: 이미 물어본 질문 집합 (같은 질문 반복 추천 방지).
+function followupsFor(text, asked) {
+  const key = topicOf(text)
+  const primary = key ? TOPICS[key].questions : []
+  const others = Object.entries(TOPICS)
+    .filter(([k]) => k !== key)
+    .flatMap(([, t]) => t.questions)
+  const fresh = (list) => list.filter((q) => q !== text && !asked.has(q))
+
+  // 1순위: 같은 주제의 안 물어본 질문 → 2순위: 다른 주제 → 3순위: 모자라면 중복 허용
+  let picked = shuffle(fresh(primary)).slice(0, 3)
+  if (picked.length < 3) {
+    picked = picked.concat(shuffle(fresh(others)).slice(0, 3 - picked.length))
+  }
+  if (picked.length < 3) {
+    const rest = shuffle([...primary, ...others].filter((q) => q !== text && !picked.includes(q)))
+    picked = picked.concat(rest.slice(0, 3 - picked.length))
+  }
+  return picked.slice(0, 3)
+}
 
 export default function ChatPage() {
   const [messages, setMessages] = useState(INITIAL)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [limitReached, setLimitReached] = useState(false) // 게스트 횟수 소진
+  const [suggestions, setSuggestions] = useState(INITIAL_SUGGESTIONS) // 현재 보여줄 추천 질문 (선택에 따라 갱신)
+  const askedRef = useRef(new Set()) // 이미 물어본 질문 — 중복 추천 방지
   const bottomRef = useRef(null)
   const taRef = useRef(null)
   const isAuthed = !!localStorage.getItem('token')
@@ -72,6 +171,9 @@ export default function ChatPage() {
     try {
       const res = await api.post('/chat', { message: text })
       setMessages((prev) => [...prev, { role: 'assistant', content: res.data.data.answer }])
+      // 방금 한 질문을 바탕으로, 같은 주제의 새로운 추천 질문 3개로 교체한다.
+      askedRef.current.add(text)
+      setSuggestions(followupsFor(text, askedRef.current))
     } catch (err) {
       // 429 = 게스트 횟수 소진 → 서버가 내려준 안내 문구 그대로 노출 + 로그인 유도 배너 표시
       if (err.response?.status === 429) {
@@ -140,13 +242,16 @@ export default function ChatPage() {
         <div ref={bottomRef} />
       </div>
 
-      {messages.length === 1 && (
-        <div className="flex gap-2 mt-3 flex-wrap">
-          {suggestions.map((s) => (
+      {/* key가 바뀌면 새로 마운트되어 fade-up 애니메이션이 다시 재생된다 */}
+      {!limitReached && suggestions.length > 0 && (
+        <div key={suggestions.join('|')} className="flex gap-2 mt-3 flex-wrap">
+          {suggestions.map((s, i) => (
             <button
               key={s}
               onClick={() => send(s)}
-              className="text-xs bg-white ring-1 ring-slate-200 text-slate-600 px-3.5 py-2 rounded-full hover:ring-emerald-300 hover:text-emerald-600 hover:bg-emerald-50 transition-all"
+              disabled={loading}
+              style={{ animationDelay: `${i * 60}ms` }}
+              className="animate-fade-up text-xs bg-white ring-1 ring-slate-200 text-slate-600 px-3.5 py-2 rounded-full hover:ring-emerald-300 hover:text-emerald-600 hover:bg-emerald-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {s}
             </button>

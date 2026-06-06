@@ -31,12 +31,13 @@ public class WelfareController {
         return ResponseEntity.ok(ApiResponse.ok(welfareService.getList(category, region, status, pageable)));
     }
 
-    @Operation(summary = "개인화 추천", description = "로그인 유저 프로필 기반 맞춤 혜택 (신청 가능 + 조건 부합)")
+    @Operation(summary = "개인화 추천", description = "로그인 유저 프로필 기반 맞춤 혜택 (신청 가능 + 조건 부합), 카테고리 필터")
     @GetMapping("/recommend")
     public ResponseEntity<ApiResponse<Page<WelfareResponse>>> getRecommended(
             @AuthenticationPrincipal User user,
+            @RequestParam(required = false) WelfareCategory category,
             @PageableDefault(size = 10) Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.ok(welfareService.getRecommended(user, pageable)));
+        return ResponseEntity.ok(ApiResponse.ok(welfareService.getRecommended(user, category, pageable)));
     }
 
     @Operation(summary = "복지 상세 조회")

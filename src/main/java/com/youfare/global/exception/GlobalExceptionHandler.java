@@ -5,11 +5,12 @@ import com.youfare.global.response.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
-import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.stream.Collectors;
 
@@ -26,8 +27,13 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(errorCode, e.getMessage()));
     }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiResponse<Void>> handleValidationException(MethodArgumentNotValidException e) {
+    /**
+     * Bean Validation 실패 처리.
+     * BindException을 잡으면 @RequestBody(JSON, MethodArgumentNotValidException은 그 하위 타입)와
+     * @ModelAttribute(multipart 폼) 검증 실패를 한 번에 처리할 수 있다.
+     */
+    @ExceptionHandler(BindException.class)
+    public ResponseEntity<ApiResponse<Void>> handleValidationException(BindException e) {
         String message = e.getBindingResult().getFieldErrors().stream()
                 .map(FieldError::getDefaultMessage)
                 .collect(Collectors.joining(", "));
@@ -35,6 +41,18 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(ErrorCode.INVALID_INPUT.getHttpStatus())
                 .body(ApiResponse.fail(ErrorCode.INVALID_INPUT, message));
+    }
+
+    /**
+     * multipart 용량 한도 초과(컨테이너 레벨 1차 방어선) → 정책 안내 메시지로 변환.
+     * 세부 정책(10개/20MB/50MB)은 MediaUploadValidator가, 극단적 초과는 여기서 막는다.
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUpload(MaxUploadSizeExceededException e) {
+        log.warn("Upload size exceeded: {}", e.getMessage());
+        return ResponseEntity
+                .status(ErrorCode.INVALID_MEDIA_UPLOAD.getHttpStatus())
+                .body(ApiResponse.fail(ErrorCode.INVALID_MEDIA_UPLOAD));
     }
 
     /** 잘못된 타입의 요청 파라미터 (예: 존재하지 않는 enum 카테고리) → 400 */

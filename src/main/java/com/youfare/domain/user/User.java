@@ -8,10 +8,13 @@ import lombok.*;
 @Table(
         name = "users",
         uniqueConstraints = {
-                // 같은 provider 안에서 socialId / email 중복 가입을 DB 차원에서 차단.
-                // (소셜 유저의 email은 null일 수 있으나 Postgres는 null을 서로 다른 값으로 취급해 무방)
+                // 같은 provider 안에서 socialId / email / phoneNumber 중복 가입을 DB 차원에서 차단.
+                // (소셜 유저의 email·phoneNumber는 null일 수 있으나 Postgres는 null을 서로 다른 값으로 취급해 무방)
+                // phoneNumber 제약이 없으면 동시 가입 race로 같은 번호가 중복 저장돼,
+                // 이후 findByPhoneNumberAndProvider가 복수 행을 만나 500(NonUniqueResult)을 던질 수 있다.
                 @UniqueConstraint(name = "uk_users_social", columnNames = {"socialId", "provider"}),
-                @UniqueConstraint(name = "uk_users_email_provider", columnNames = {"email", "provider"})
+                @UniqueConstraint(name = "uk_users_email_provider", columnNames = {"email", "provider"}),
+                @UniqueConstraint(name = "uk_users_phone_provider", columnNames = {"phoneNumber", "provider"})
         }
 )
 @Getter

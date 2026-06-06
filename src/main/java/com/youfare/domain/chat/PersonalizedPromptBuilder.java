@@ -103,7 +103,7 @@ public class PersonalizedPromptBuilder {
     private String buildWelfareSummary(Integer age, String region) {
         try {
             List<Welfare> list = welfareRepository
-                    .findPersonalized(age, region, LocalDate.now(), PageRequest.of(0, 5))
+                    .findPersonalized(age, region, null, LocalDate.now(), PageRequest.of(0, 5))
                     .getContent();
 
             if (list.isEmpty()) return "- 현재 조건에 맞는 혜택 정보가 없습니다.";

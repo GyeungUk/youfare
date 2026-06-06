@@ -42,14 +42,22 @@ public interface WelfareRepository extends JpaRepository<Welfare, Long> {
     // 마감일 조건: applyEndDate가 NULL(상시모집)이거나 오늘 이후인 건을 모두 포함
     //   (NULL을 제외하면 상시 사업이 추천에서 통째로 빠지므로 명시적으로 OR NULL 처리)
     // 나이 조건 괄호: (:age IS NULL OR (minAge조건 AND maxAge조건)) 명시적으로 래핑
+    // category 필터: findByFilter와 동일하게 enum.name() 문자열로 받아 타입 추론 오류 회피
+    // 정렬: 내 지역 사업 먼저(서울 유저면 서울 우선) → 전국은 그 뒤 → 마감 임박순 → 최신 등록순
+    //   (WHERE가 지역을 {내 지역, 전국}으로 좁히므로 '전국'이 아닌 건 곧 내 지역 사업이다.
+    //    서울 거주자는 서울 혜택부터 보고 싶어 하므로 전국 더미를 뒤로 미룬다.)
     @Query("SELECT w FROM Welfare w WHERE " +
            "(w.applyEndDate IS NULL OR w.applyEndDate >= :today) AND " +
+           "(:category IS NULL OR CAST(w.category AS string) = :category) AND " +
            "(:age IS NULL OR ((w.targetAgeMin IS NULL OR w.targetAgeMin <= :age) AND " +
            "                  (w.targetAgeMax IS NULL OR w.targetAgeMax >= :age))) AND " +
-           "(:region IS NULL OR w.region = '전국' OR w.region LIKE CONCAT('%', CAST(:region AS string), '%'))")
+           "(:region IS NULL OR w.region = '전국' OR w.region LIKE CONCAT('%', CAST(:region AS string), '%')) " +
+           "ORDER BY CASE WHEN w.region = '전국' THEN 1 ELSE 0 END ASC, " +
+           "         w.applyEndDate ASC NULLS LAST, w.id DESC")
     Page<Welfare> findPersonalized(
             @Param("age") Integer age,
             @Param("region") String region,
+            @Param("category") String category,
             @Param("today") LocalDate today,
             Pageable pageable);
 }

@@ -23,6 +23,13 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
     open-in-view: false
 
+  # 업로드 용량의 1차(컨테이너) 방어선. 세부 정책(10개/각 20MB/총 50MB)은 MediaUploadValidator가 담당하므로
+  # 여기선 정책보다 약간 넉넉히 잡아, 정책 위반이 친절한 메시지로 응답되게 한다(극단적 초과만 여기서 차단).
+  servlet:
+    multipart:
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:21MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:55MB}
+
   security:
     oauth2:
       client:
@@ -84,8 +91,39 @@ chat:
   # 비로그인(게스트) 1일 AI 상담 허용 횟수 (IP 기준). 로그인 유저는 제한 없음.
   guest-daily-limit: ${CHAT_GUEST_DAILY_LIMIT:5}
 
+# 인증(전화번호 목업) 정책
+auth:
+  phone:
+    # 데모용 인증번호를 HTTP 응답(devCode)으로 노출할지 여부.
+    # 운영 기본 false — true면 타인 번호의 인증번호를 누구나 받아 계정 탈취가 가능하다.
+    # 로컬 데모에서만 AUTH_PHONE_EXPOSE_DEV_CODE=true 로 켠다(코드는 서버 로그로도 확인 가능).
+    expose-dev-code: ${AUTH_PHONE_EXPOSE_DEV_CODE:false}
+
+# 관리자 API 보호
+admin:
+  # /admin/welfare/sync 수동 동기화 호출 시 요구하는 키(헤더 X-ADMIN-KEY).
+  # 비워두면 엔드포인트는 항상 차단된다(평소엔 시더/스케줄러가 자동 동기화하므로 호출 불필요).
+  api-key: ${ADMIN_API_KEY:}
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
   api-docs:
     path: /v3/api-docs
+
+# 이미지 저장소. 개발은 local(디스크), 배포는 s3(S3 호환: AWS S3 / Cloudflare R2 / MinIO).
+# 환경마다 STORAGE_TYPE 하나만 바꾸면 되고, 검증 로직은 종류와 무관하게 동일하게 동작한다.
+storage:
+  type: ${STORAGE_TYPE:local}
+  local:
+    base-dir: ${STORAGE_LOCAL_DIR:./uploads}
+    base-url: ${STORAGE_LOCAL_BASE_URL:http://localhost:8080/uploads}
+  s3:
+    bucket: ${S3_BUCKET:}
+    region: ${S3_REGION:ap-northeast-2}
+    # AWS가 아닌 S3 호환 스토리지(R2/MinIO)일 때만 지정. 비우면 AWS 기본 엔드포인트.
+    endpoint: ${S3_ENDPOINT:}
+    access-key: ${S3_ACCESS_KEY:}
+    secret-key: ${S3_SECRET_KEY:}
+    # 공개 URL 접두어(CDN/커스텀 도메인/r2.dev). 비우면 AWS virtual-hosted URL 자동 생성.
+    public-base-url: ${S3_PUBLIC_BASE_URL:}

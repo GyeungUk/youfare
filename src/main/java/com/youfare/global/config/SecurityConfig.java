@@ -68,6 +68,9 @@ public class SecurityConfig {
                     "/login/**",
                     "/oauth2/**"
                 ).permitAll()
+                // 로컬 스토리지로 저장된 업로드 이미지의 정적 서빙(/uploads/**)은 공개 조회 허용.
+                // (S3 모드에선 이미지가 오브젝트 스토리지를 직접 가리키므로 이 경로는 사용되지 않는다.)
+                .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                 // 관리자 수동 동기화는 외부 API를 대량 호출하므로 공개 금지(인증 필요).
                 // 신규 DB는 WelfareDataSeeder가 기동 시 1회 자동 시드하므로 평소 호출할 일은 없다.
                 .requestMatchers(HttpMethod.POST, "/admin/welfare/sync").authenticated()
