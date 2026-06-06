@@ -40,6 +40,9 @@ out/
 frontend/node_modules/
 frontend/dist/
 
+### Uploads (로컬 스토리지 저장 파일) ###
+uploads/
+
 ### Env / Secrets ###
 .env
 !.env.example

@@ -1,0 +1,61 @@
+# Render Blueprint — 백엔드(Spring Boot, Docker) + Postgres 동시 정의.
+# Render 대시보드 → "New" → "Blueprint" → 이 레포 연결하면 아래 두 리소스가 한 번에 생성된다.
+#
+# sync:false 인 값은 레포에 안 담기고 Render 대시보드에서 직접 입력(시크릿 보호).
+# DB 접속값(host/port/...)은 youfare-db에서 자동 주입되므로 손댈 필요 없음.
+
+databases:
+  - name: youfare-db
+    databaseName: youfare
+    user: youfare
+    plan: free
+    region: singapore        # 한국에서 가장 가까운 무료 리전
+
+services:
+  - type: web
+    name: youfare-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    # Render는 $PORT를 주입하고 app은 server.port=${PORT}로 읽는다(application.yml). 추가 설정 불필요.
+    envVars:
+      # --- DB: youfare-db에서 자동 주입 ---
+      - key: DB_HOST
+        fromDatabase: { name: youfare-db, property: host }
+      - key: DB_PORT
+        fromDatabase: { name: youfare-db, property: port }
+      - key: DB_NAME
+        fromDatabase: { name: youfare-db, property: database }
+      - key: DB_USERNAME
+        fromDatabase: { name: youfare-db, property: user }
+      - key: DB_PASSWORD
+        fromDatabase: { name: youfare-db, property: password }
+
+      # --- 프론트 origin: Vercel 배포 후 그 주소로 채운다(CORS + OAuth 리다이렉트 기준) ---
+      - key: FRONTEND_URL
+        sync: false           # 예) https://youfare.vercel.app
+
+      # --- 시크릿: 대시보드에서 입력 ---
+      - key: JWT_SECRET
+        generateValue: true   # Render가 안전한 랜덤값 자동 생성
+      - key: GROQ_API_KEY
+        sync: false
+      - key: KAKAO_CLIENT_ID
+        sync: false
+      - key: KAKAO_CLIENT_SECRET
+        sync: false
+      - key: KAKAO_REDIRECT_URI
+        sync: false           # 예) https://youfare-api.onrender.com/login/oauth2/code/kakao
+      - key: NAVER_CLIENT_ID
+        sync: false
+      - key: NAVER_CLIENT_SECRET
+        sync: false
+      - key: NAVER_REDIRECT_URI
+        sync: false           # 예) https://youfare-api.onrender.com/login/oauth2/code/naver
+      - key: PUBLIC_DATA_API_KEY
+        sync: false
+
+      # --- 선택 ---
+      - key: ADMIN_API_KEY
+        sync: false           # 수동 동기화 안 쓰면 비워둬도 됨(엔드포인트 차단됨)
