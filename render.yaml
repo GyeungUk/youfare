@@ -56,14 +56,17 @@ services:
       - key: PUBLIC_DATA_API_KEY
         sync: false
 
-      # --- 이메일 인증(회원가입/비번재설정 OTP 발송, Resend HTTP API) ---
-      # Render는 SMTP 아웃바운드 포트를 막으므로 Gmail SMTP 대신 Resend HTTP API를 쓴다.
-      # https://resend.com 가입 → API Keys 에서 re_... 키 발급해서 RESEND_API_KEY에 입력.
+      # --- 이메일 인증(회원가입/비번재설정 OTP 발송, Brevo HTTP API) ---
+      # Render는 SMTP 아웃바운드 포트를 막으므로 SMTP 대신 Brevo HTTP API를 쓴다.
+      # https://app.brevo.com → SMTP & API → API Keys 에서 xkeysib-... 키 발급해서 BREVO_API_KEY에 입력.
+      # MAIL_FROM은 Brevo의 Senders & IP 에서 인증한 발신 이메일(도메인 없이 본인 주소 인증으로 가능).
       # 비우면 /auth/email/send 가 MAIL_SEND_FAILED 로 실패한다.
-      - key: RESEND_API_KEY
-        sync: false           # re_... 형식의 Resend API 키
+      - key: BREVO_API_KEY
+        sync: false           # xkeysib-... 형식의 Brevo API 키
       - key: MAIL_FROM
-        sync: false           # 예) onboarding@resend.dev (도메인 미인증 테스트용)
+        sync: false           # Brevo에서 인증한 발신 이메일 (예: ruddnr2062@gmail.com)
+      - key: MAIL_FROM_NAME
+        sync: false           # 발신자 표시 이름 (예: YouFare)
 
       # --- 선택 ---
       - key: ADMIN_API_KEY

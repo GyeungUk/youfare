@@ -96,15 +96,17 @@ auth:
   email:
     # 인증번호 유효시간(초). 기본 3분.
     code-ttl-seconds: ${AUTH_EMAIL_CODE_TTL_SECONDS:180}
-    # 발신 주소. Resend는 도메인 인증 없이 onboarding@resend.dev 로 발송 가능(테스트용).
-    # 자체 도메인을 Resend에 등록했다면 no-reply@yourdomain 형태로 교체.
-    from: ${MAIL_FROM:onboarding@resend.dev}
+    # 발신 주소. Brevo에서 인증(verify)한 발신 이메일을 넣는다(도메인 없이 본인 주소 인증으로 가능).
+    from: ${MAIL_FROM:}
+    # 발신자 표시 이름.
+    from-name: ${MAIL_FROM_NAME:YouFare}
 
-# 이메일 발송용 Resend HTTP API (Render가 SMTP 아웃바운드를 차단하므로 SMTP 대신 사용).
-# https://resend.com 가입 → API Keys 에서 re_... 키 발급 → RESEND_API_KEY 에 입력.
-resend:
-  base-url: ${RESEND_BASE_URL:https://api.resend.com}
-  api-key: ${RESEND_API_KEY:}
+# 이메일 발송용 Brevo HTTP API (Render가 SMTP 아웃바운드를 차단하므로 SMTP 대신 사용).
+# https://app.brevo.com → SMTP & API → API Keys 에서 xkeysib-... 키 발급 → BREVO_API_KEY 에 입력.
+# 발신 이메일은 Senders & IP 메뉴에서 인증해야 하며, 인증 후엔 도메인 없이 임의 수신자에게 발송 가능.
+brevo:
+  base-url: ${BREVO_BASE_URL:https://api.brevo.com/v3}
+  api-key: ${BREVO_API_KEY:}
 
 # 관리자 API 보호
 admin:

@@ -28,8 +28,8 @@ import static org.mockito.BDDMockito.given;
 class EmailVerificationServiceTest {
 
     @Mock JwtProvider jwtProvider;
-    // 발송은 Resend HTTP API(WebClient)로 한다. 플루언트 체인을 깊은 스텁으로 모킹한다.
-    @Mock(answer = Answers.RETURNS_DEEP_STUBS) WebClient resendWebClient;
+    // 발송은 Brevo HTTP API(WebClient)로 한다. 플루언트 체인을 깊은 스텁으로 모킹한다.
+    @Mock(answer = Answers.RETURNS_DEEP_STUBS) WebClient brevoWebClient;
     EmailVerificationService service;
 
     private static final String EMAIL = "user@test.com";
@@ -37,20 +37,20 @@ class EmailVerificationServiceTest {
     @BeforeEach
     void setUp() {
         service = new EmailVerificationService(
-                jwtProvider, resendWebClient, "re_test_key", "noreply@test.com", 180L);
+                jwtProvider, brevoWebClient, "xkeysib-test", "noreply@test.com", "YouFare", 180L);
     }
 
-    /** Resend 호출이 성공하도록 스텁하고, 전송 본문에서 6자리 코드를 추출한다. */
+    /** Brevo 호출이 성공하도록 스텁하고, 전송 본문(textContent)에서 6자리 코드를 추출한다. */
     private String sendAndCaptureCode(String email) {
         ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
-        given(resendWebClient.post().uri(anyString()).bodyValue(bodyCaptor.capture())
+        given(brevoWebClient.post().uri(anyString()).bodyValue(bodyCaptor.capture())
                 .retrieve().bodyToMono(Void.class)).willReturn(Mono.empty());
 
         service.issueCode(email);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> body = (Map<String, Object>) bodyCaptor.getValue();
-        Matcher m = Pattern.compile("(\\d{6})").matcher((String) body.get("text"));
+        Matcher m = Pattern.compile("(\\d{6})").matcher((String) body.get("textContent"));
         assertThat(m.find()).isTrue();
         return m.group(1);
     }
@@ -100,9 +100,9 @@ class EmailVerificationServiceTest {
     @Test
     @DisplayName("메일 발송 실패 → MAIL_SEND_FAILED, 코드 저장도 롤백되어 이후 검증은 NOT_FOUND")
     void issue_mailSendFails() {
-        given(resendWebClient.post().uri(anyString()).bodyValue(any())
+        given(brevoWebClient.post().uri(anyString()).bodyValue(any())
                 .retrieve().bodyToMono(Void.class))
-                .willReturn(Mono.error(new RuntimeException("resend down")));
+                .willReturn(Mono.error(new RuntimeException("brevo down")));
 
         assertThatThrownBy(() -> service.issueCode(EMAIL))
                 .isInstanceOf(BusinessException.class)

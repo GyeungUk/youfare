@@ -33,12 +33,14 @@ public class WebClientConfig {
     }
 
     @Bean
-    public WebClient resendWebClient(@Value("${resend.base-url}") String baseUrl,
-                                     @Value("${resend.api-key:}") String apiKey) {
+    public WebClient brevoWebClient(@Value("${brevo.base-url}") String baseUrl,
+                                    @Value("${brevo.api-key:}") String apiKey) {
+        // Brevo는 Authorization 헤더가 아니라 전용 'api-key' 헤더로 인증한다.
         return WebClient.builder()
                 .baseUrl(baseUrl)
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                .defaultHeader("api-key", apiKey)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
                 .build();
     }
 
