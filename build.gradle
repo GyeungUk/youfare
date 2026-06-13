@@ -30,10 +30,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // 이메일 인증번호 발송(Resend HTTP API)·AI 상담 등 외부 HTTP 호출용 WebClient 제공.
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
-
-    // 이메일 인증번호 발송 (Gmail SMTP). JavaMailSender 제공.
-    implementation 'org.springframework.boot:spring-boot-starter-mail'
 
     // PostgreSQL
     runtimeOnly 'org.postgresql:postgresql'

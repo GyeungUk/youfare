@@ -6,25 +6,6 @@ server:
   forward-headers-strategy: framework
 
 spring:
-  # 이메일 인증번호 발송 (Gmail SMTP). MAIL_USERNAME=gmail주소, MAIL_PASSWORD=앱 비밀번호(16자리).
-  # 일반 비밀번호가 아니라 반드시 '앱 비밀번호'를 써야 한다(2단계 인증 필요).
-  mail:
-    host: ${MAIL_HOST:smtp.gmail.com}
-    port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
-            required: true
-        # 연결/응답 지연 시 너무 오래 매달리지 않게 타임아웃(ms).
-        transport:
-          protocol: smtp
-    default-encoding: UTF-8
-
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:youfare}
     username: ${DB_USERNAME:youfare}
@@ -115,6 +96,15 @@ auth:
   email:
     # 인증번호 유효시간(초). 기본 3분.
     code-ttl-seconds: ${AUTH_EMAIL_CODE_TTL_SECONDS:180}
+    # 발신 주소. Resend는 도메인 인증 없이 onboarding@resend.dev 로 발송 가능(테스트용).
+    # 자체 도메인을 Resend에 등록했다면 no-reply@yourdomain 형태로 교체.
+    from: ${MAIL_FROM:onboarding@resend.dev}
+
+# 이메일 발송용 Resend HTTP API (Render가 SMTP 아웃바운드를 차단하므로 SMTP 대신 사용).
+# https://resend.com 가입 → API Keys 에서 re_... 키 발급 → RESEND_API_KEY 에 입력.
+resend:
+  base-url: ${RESEND_BASE_URL:https://api.resend.com}
+  api-key: ${RESEND_API_KEY:}
 
 # 관리자 API 보호
 admin:

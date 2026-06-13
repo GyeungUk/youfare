@@ -56,13 +56,14 @@ services:
       - key: PUBLIC_DATA_API_KEY
         sync: false
 
-      # --- 이메일 인증(회원가입/비번재설정 OTP 발송, Gmail SMTP) ---
-      # Gmail 계정 → 보안 → 2단계 인증 ON → '앱 비밀번호' 16자리 발급해서 MAIL_PASSWORD에 입력.
-      # 둘 다 비우면 /auth/email/send 가 MAIL_SEND_FAILED 로 실패한다.
-      - key: MAIL_USERNAME
-        sync: false           # 예) yourname@gmail.com
-      - key: MAIL_PASSWORD
-        sync: false           # Gmail 앱 비밀번호 16자리
+      # --- 이메일 인증(회원가입/비번재설정 OTP 발송, Resend HTTP API) ---
+      # Render는 SMTP 아웃바운드 포트를 막으므로 Gmail SMTP 대신 Resend HTTP API를 쓴다.
+      # https://resend.com 가입 → API Keys 에서 re_... 키 발급해서 RESEND_API_KEY에 입력.
+      # 비우면 /auth/email/send 가 MAIL_SEND_FAILED 로 실패한다.
+      - key: RESEND_API_KEY
+        sync: false           # re_... 형식의 Resend API 키
+      - key: MAIL_FROM
+        sync: false           # 예) onboarding@resend.dev (도메인 미인증 테스트용)
 
       # --- 선택 ---
       - key: ADMIN_API_KEY

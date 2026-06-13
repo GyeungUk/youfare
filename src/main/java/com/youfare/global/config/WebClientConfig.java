@@ -33,6 +33,16 @@ public class WebClientConfig {
     }
 
     @Bean
+    public WebClient resendWebClient(@Value("${resend.base-url}") String baseUrl,
+                                     @Value("${resend.api-key:}") String apiKey) {
+        return WebClient.builder()
+                .baseUrl(baseUrl)
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .build();
+    }
+
+    @Bean
     public WebClient publicDataWebClient(@Value("${public-data.base-url}") String baseUrl) {
         return WebClient.builder()
                 .baseUrl(baseUrl)

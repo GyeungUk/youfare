@@ -7,43 +7,50 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mail.MailSendException;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
+
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class EmailVerificationServiceTest {
 
     @Mock JwtProvider jwtProvider;
-    @Mock JavaMailSender mailSender;
+    // 발송은 Resend HTTP API(WebClient)로 한다. 플루언트 체인을 깊은 스텁으로 모킹한다.
+    @Mock(answer = Answers.RETURNS_DEEP_STUBS) WebClient resendWebClient;
     EmailVerificationService service;
 
     private static final String EMAIL = "user@test.com";
 
     @BeforeEach
     void setUp() {
-        service = new EmailVerificationService(jwtProvider, mailSender);
-        ReflectionTestUtils.setField(service, "codeTtlSeconds", 180L);
-        ReflectionTestUtils.setField(service, "fromAddress", "noreply@test.com");
+        service = new EmailVerificationService(
+                jwtProvider, resendWebClient, "re_test_key", "noreply@test.com", 180L);
     }
 
-    /** 발송된 메일 본문에서 6자리 코드를 추출한다. */
+    /** Resend 호출이 성공하도록 스텁하고, 전송 본문에서 6자리 코드를 추출한다. */
     private String sendAndCaptureCode(String email) {
+        ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
+        given(resendWebClient.post().uri(anyString()).bodyValue(bodyCaptor.capture())
+                .retrieve().bodyToMono(Void.class)).willReturn(Mono.empty());
+
         service.issueCode(email);
-        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
-        verify(mailSender).send(captor.capture());
-        String body = captor.getValue().getText();
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d{6})").matcher(body);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) bodyCaptor.getValue();
+        Matcher m = Pattern.compile("(\\d{6})").matcher((String) body.get("text"));
         assertThat(m.find()).isTrue();
         return m.group(1);
     }
@@ -93,10 +100,17 @@ class EmailVerificationServiceTest {
     @Test
     @DisplayName("메일 발송 실패 → MAIL_SEND_FAILED, 코드 저장도 롤백되어 이후 검증은 NOT_FOUND")
     void issue_mailSendFails() {
-        doThrow(new MailSendException("smtp down")).when(mailSender).send(org.mockito.ArgumentMatchers.any(SimpleMailMessage.class));
+        given(resendWebClient.post().uri(anyString()).bodyValue(any())
+                .retrieve().bodyToMono(Void.class))
+                .willReturn(Mono.error(new RuntimeException("resend down")));
 
         assertThatThrownBy(() -> service.issueCode(EMAIL))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.MAIL_SEND_FAILED);
+
+        // 발송 실패 시 코드가 저장돼 있으면 안 된다.
+        assertThatThrownBy(() -> service.verifyCode(EMAIL, "123456"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.EMAIL_CODE_NOT_FOUND);
     }
 }
