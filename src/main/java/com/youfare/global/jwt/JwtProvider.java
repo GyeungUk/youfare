@@ -70,12 +70,12 @@ public class JwtProvider {
         );
     }
 
-    /** 전화번호 인증 완료 증명용 단기 토큰(10분). 회원가입 시 이 토큰으로 "인증된 번호"임을 증명한다. */
-    public String generatePhoneToken(String phoneNumber) {
+    /** 이메일 인증 완료 증명용 단기 토큰(10분). 회원가입·비번재설정 시 이 토큰으로 "인증된 이메일"임을 증명한다. */
+    public String generateEmailToken(String email) {
         Date now = new Date();
         return Jwts.builder()
-                .subject(phoneNumber)
-                .claim("purpose", "PHONE_VERIFY")
+                .subject(email)
+                .claim("purpose", "EMAIL_VERIFY")
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + 600_000)) // 10분
                 .signWith(secretKey)
@@ -83,15 +83,15 @@ public class JwtProvider {
     }
 
     /**
-     * 전화 인증 토큰을 검증하고 인증된 번호를 반환.
+     * 이메일 인증 토큰을 검증하고 인증된 이메일을 반환.
      * 서명·만료·purpose가 어긋나면 JwtException 계열 예외를 던진다(호출부에서 처리).
      */
-    public String getVerifiedPhone(String phoneToken) {
+    public String getVerifiedEmail(String emailToken) {
         var claims = Jwts.parser().verifyWith(secretKey).build()
-                .parseSignedClaims(phoneToken)
+                .parseSignedClaims(emailToken)
                 .getPayload();
-        if (!"PHONE_VERIFY".equals(claims.get("purpose", String.class))) {
-            throw new JwtException("전화 인증 토큰이 아닙니다.");
+        if (!"EMAIL_VERIFY".equals(claims.get("purpose", String.class))) {
+            throw new JwtException("이메일 인증 토큰이 아닙니다.");
         }
         return claims.getSubject();
     }

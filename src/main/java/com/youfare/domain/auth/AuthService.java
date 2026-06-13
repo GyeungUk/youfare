@@ -23,7 +23,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
 
-    /** 폼 회원가입 — 약관 동의·전화 인증 검증 후 BCrypt 해시로 저장, 즉시 accessToken 발급 */
+    /** 폼 회원가입 — 약관 동의·이메일 인증 검증 후 BCrypt 해시로 저장, 즉시 accessToken 발급 */
     @Transactional
     public TokenResponse signup(SignupRequest request) {
         // 0. 필수 약관 동의 (DTO @AssertTrue로 1차 검증되지만, 서비스에서도 방어)
@@ -32,24 +32,19 @@ public class AuthService {
         }
 
         String email = normalizeEmail(request.getEmail());
-        String phone = normalizePhone(request.getPhoneNumber());
 
-        // 1. 전화 인증 토큰 검증 — 토큰이 가리키는 번호와 입력 번호가 일치해야 함
-        verifyPhoneToken(request.getPhoneVerificationToken(), phone);
+        // 1. 이메일 인증 토큰 검증 — 토큰이 가리키는 이메일과 가입 이메일이 일치해야 함
+        verifyEmailToken(request.getEmailVerificationToken(), email);
 
         // 2. 애플리케이션 레벨 중복 검사 (친절한 메시지)
         if (userRepository.existsByEmailAndProvider(email, Provider.LOCAL)) {
             throw new BusinessException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
-        if (userRepository.existsByPhoneNumberAndProvider(phone, Provider.LOCAL)) {
-            throw new BusinessException(ErrorCode.PHONE_ALREADY_EXISTS);
-        }
 
         User user = User.ofLocal(
                 email,
                 passwordEncoder.encode(request.getPassword()),
-                request.getNickname().trim(),
-                phone
+                request.getNickname().trim()
         );
 
         try {
@@ -64,55 +59,38 @@ public class AuthService {
     }
 
     /**
-     * 아이디(이메일) 찾기 — 전화 인증 토큰의 번호로 가입한 LOCAL 계정을 찾아 가입 이메일 전체를 반환.
-     * 소셜 가입자는 비밀번호/폼 로그인이 없어 대상에서 제외(LOCAL만 조회).
-     */
-    @Transactional(readOnly = true)
-    public FindEmailResponse findEmail(FindEmailRequest request) {
-        String phone = verifiedPhoneFromToken(request.getPhoneVerificationToken());
-
-        User user = userRepository.findByPhoneNumberAndProvider(phone, Provider.LOCAL)
-                .orElseThrow(() -> new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND));
-
-        return FindEmailResponse.builder()
-                .email(user.getEmail())
-                .build();
-    }
-
-    /**
-     * 비밀번호 재설정 — 전화 인증을 마친 번호로 가입한 LOCAL 계정을 찾아 새 비밀번호로 교체.
-     * 본인 확인은 전화 OTP가 책임지며(전화번호는 LOCAL 내에서 유일), 입력 이메일은 화면 표시용일 뿐
-     * 매칭 조건이 아니다. (이메일 대소문자·오타로 "계정을 찾을 수 없음"이 뜨던 문제를 없앤다.)
+     * 비밀번호 재설정 — 이메일 인증을 마친 이메일로 가입한 LOCAL 계정을 찾아 새 비밀번호로 교체.
+     * 본인 확인은 이메일 OTP가 책임진다.
      */
     @Transactional
     public void resetPassword(ResetPasswordRequest request) {
-        String phone = verifiedPhoneFromToken(request.getPhoneVerificationToken());
+        String email = verifiedEmailFromToken(request.getEmailVerificationToken());
 
-        User user = userRepository.findByPhoneNumberAndProvider(phone, Provider.LOCAL)
+        User user = userRepository.findByEmailAndProvider(email, Provider.LOCAL)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND));
 
         user.updatePassword(passwordEncoder.encode(request.getNewPassword()));
     }
 
-    /** 전화 인증 토큰을 검증하고 정규화된 번호를 반환 (실패 시 PHONE_NOT_VERIFIED) */
-    private String verifiedPhoneFromToken(String phoneToken) {
+    /** 이메일 인증 토큰을 검증하고 정규화된 이메일을 반환 (실패 시 EMAIL_NOT_VERIFIED) */
+    private String verifiedEmailFromToken(String emailToken) {
         try {
-            return normalizePhone(jwtProvider.getVerifiedPhone(phoneToken));
+            return normalizeEmail(jwtProvider.getVerifiedEmail(emailToken));
         } catch (JwtException e) {
-            throw new BusinessException(ErrorCode.PHONE_NOT_VERIFIED);
+            throw new BusinessException(ErrorCode.EMAIL_NOT_VERIFIED);
         }
     }
 
-    /** phoneVerificationToken이 유효하고, 그 안의 번호가 가입 번호와 같은지 확인 */
-    private void verifyPhoneToken(String phoneToken, String phone) {
-        String verifiedPhone;
+    /** emailVerificationToken이 유효하고, 그 안의 이메일이 가입 이메일과 같은지 확인 */
+    private void verifyEmailToken(String emailToken, String email) {
+        String verifiedEmail;
         try {
-            verifiedPhone = jwtProvider.getVerifiedPhone(phoneToken);
+            verifiedEmail = jwtProvider.getVerifiedEmail(emailToken);
         } catch (JwtException e) {
-            throw new BusinessException(ErrorCode.PHONE_NOT_VERIFIED);
+            throw new BusinessException(ErrorCode.EMAIL_NOT_VERIFIED);
         }
-        if (!phone.equals(normalizePhone(verifiedPhone))) {
-            throw new BusinessException(ErrorCode.PHONE_NOT_VERIFIED);
+        if (!email.equals(normalizeEmail(verifiedEmail))) {
+            throw new BusinessException(ErrorCode.EMAIL_NOT_VERIFIED);
         }
     }
 
@@ -132,10 +110,5 @@ public class AuthService {
     /** 대소문자·공백 차이로 같은 메일이 다른 계정이 되는 것을 막기 위해 정규화 */
     private String normalizeEmail(String email) {
         return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
-    }
-
-    /** 하이픈·공백 등을 제거해 숫자만 남긴다 (010-1234-5678 → 01012345678) */
-    private String normalizePhone(String phone) {
-        return phone == null ? null : phone.replaceAll("[^0-9]", "");
     }
 }

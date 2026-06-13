@@ -1,14 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import api from '../api/axios'
 
-// 아이디(이메일) 찾기 + 비밀번호 재설정. 둘 다 전화번호 인증으로 본인을 확인한다.
-//  - 회원가입과 동일한 /auth/phone/send · /auth/phone/verify 흐름을 재사용한다.
+// 비밀번호 재설정. 가입 이메일로 인증번호를 받아 본인을 확인한 뒤 새 비밀번호로 교체한다.
+//  - 회원가입과 동일한 /auth/email/send · /auth/email/verify 흐름을 재사용한다.
+//  - (아이디=이메일 이므로 '아이디 찾기'는 제공하지 않는다.)
 export default function FindAccountPage() {
   const navigate = useNavigate()
-  const [params] = useSearchParams()
-  // ?tab=password 로 들어오면 비밀번호 탭으로 시작 (로그인 화면의 '비밀번호 찾기' 링크용)
-  const [tab, setTab] = useState(params.get('tab') === 'password' ? 'password' : 'email')
 
   return (
     <div className="relative min-h-screen flex items-center justify-center px-4 py-10 overflow-hidden bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50">
@@ -30,20 +28,11 @@ export default function FindAccountPage() {
           </button>
 
           <div className="text-center mb-7">
-            <h1 className="text-2xl font-black text-gradient">계정 찾기</h1>
-            <p className="text-slate-500 mt-2 text-sm">가입할 때 인증한 휴대폰 번호로 확인해요</p>
+            <h1 className="text-2xl font-black text-gradient">비밀번호 재설정</h1>
+            <p className="text-slate-500 mt-2 text-sm">가입한 이메일로 인증한 뒤 새 비밀번호를 설정해요</p>
           </div>
 
-          {/* 탭 */}
-          <div className="flex gap-1 p-1 rounded-2xl bg-slate-100 mb-6">
-            <TabBtn active={tab === 'email'} onClick={() => setTab('email')}>아이디 찾기</TabBtn>
-            <TabBtn active={tab === 'password'} onClick={() => setTab('password')}>비밀번호 재설정</TabBtn>
-          </div>
-
-          {/* key로 탭 전환 시 내부 상태를 초기화 */}
-          {tab === 'email'
-            ? <FindEmailFlow key="email" />
-            : <ResetPasswordFlow key="password" navigate={navigate} />}
+          <ResetPasswordFlow navigate={navigate} />
         </div>
 
         <p className="text-center text-sm text-slate-500 mt-5">
@@ -55,73 +44,16 @@ export default function FindAccountPage() {
   )
 }
 
-function TabBtn({ active, onClick, children }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
-        active ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-      }`}
-    >
-      {children}
-    </button>
-  )
-}
-
-/* ---------- 아이디(이메일) 찾기 ---------- */
-function FindEmailFlow() {
-  const [result, setResult] = useState('')   // 가린 이메일
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  async function onVerified(phoneToken) {
-    setError(''); setBusy(true)
-    try {
-      const r = await api.post('/auth/find-email', { phoneVerificationToken: phoneToken })
-      setResult(r.data?.data?.email || '')
-    } catch (err) {
-      setError(err.response?.data?.message || '계정을 찾지 못했어요.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  if (result) {
-    return (
-      <div className="space-y-4 text-center">
-        <p className="text-sm text-slate-500">가입한 이메일이에요</p>
-        <div className="rounded-2xl bg-emerald-50 ring-1 ring-emerald-200 px-4 py-5 text-lg font-bold text-emerald-700 tracking-wide">
-          {result}
-        </div>
-        <Link
-          to="/login"
-          className="block w-full bg-gradient-to-br from-emerald-500 to-teal-600 hover:brightness-105 text-white font-bold py-4 rounded-2xl transition-all hover:-translate-y-0.5 shadow-sm text-base"
-        >
-          로그인하러 가기
-        </Link>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-3">
-      <PhoneVerify onVerified={onVerified} disabled={busy} ctaLabel="이메일 찾기" />
-      {error && <p className="text-sm text-red-600 px-1">{error}</p>}
-    </div>
-  )
-}
-
 /* ---------- 비밀번호 재설정 ---------- */
 function ResetPasswordFlow({ navigate }) {
-  const [email, setEmail] = useState('')
-  const [phoneToken, setPhoneToken] = useState('')
+  const [emailToken, setEmailToken] = useState('')
   const [pw, setPw] = useState('')
   const [pw2, setPw2] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const pwMismatch = pw2.length > 0 && pw !== pw2
-  const canSubmit = email && phoneToken && pw.length >= 8 && !pwMismatch && !submitting
+  const canSubmit = emailToken && pw.length >= 8 && !pwMismatch && !submitting
 
   async function submit(e) {
     e.preventDefault()
@@ -130,8 +62,7 @@ function ResetPasswordFlow({ navigate }) {
     setSubmitting(true)
     try {
       await api.post('/auth/reset-password', {
-        email,
-        phoneVerificationToken: phoneToken,
+        emailVerificationToken: emailToken,
         newPassword: pw,
       })
       alert('비밀번호가 변경됐어요. 새 비밀번호로 로그인해 주세요.')
@@ -144,20 +75,10 @@ function ResetPasswordFlow({ navigate }) {
 
   return (
     <form onSubmit={submit} className="space-y-3">
-      <input
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="가입한 이메일"
-        autoComplete="email"
-        required
-        className="w-full px-4 py-3.5 rounded-2xl bg-white ring-1 ring-slate-200 focus:ring-2 focus:ring-emerald-400 outline-none text-sm transition-all"
-      />
+      <EmailVerify onVerified={setEmailToken} ctaLabel="인증하기" />
 
-      <PhoneVerify onVerified={setPhoneToken} ctaLabel="인증하기" />
-
-      {/* 전화 인증을 마쳐야 새 비밀번호 입력을 연다 */}
-      {phoneToken && (
+      {/* 이메일 인증을 마쳐야 새 비밀번호 입력을 연다 */}
+      {emailToken && (
         <>
           <input
             type="password"
@@ -196,23 +117,23 @@ function ResetPasswordFlow({ navigate }) {
   )
 }
 
-/* ---------- 공통: 전화번호 인증 블록 ----------
- * 인증요청 → 6자리 코드 확인까지 끝나면 onVerified(phoneVerificationToken)로 토큰을 올려준다.
- * 데모이므로 발급 코드를 화면에 노출한다(SignupPage와 동일).
+/* ---------- 공통: 이메일 인증 블록 ----------
+ * 인증요청 → 6자리 코드 확인까지 끝나면 onVerified(emailVerificationToken)로 토큰을 올려준다.
  */
-function PhoneVerify({ onVerified, disabled, ctaLabel = '인증하기' }) {
-  const [phone, setPhone] = useState('')
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function EmailVerify({ onVerified, disabled, ctaLabel = '인증하기' }) {
+  const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [sent, setSent] = useState(false)
-  const [devCode, setDevCode] = useState('')
+  const [info, setInfo] = useState('')
   const [verified, setVerified] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [secondsLeft, setSecondsLeft] = useState(0)
   const timerRef = useRef(null)
 
-  const digits = phone.replace(/[^0-9]/g, '')
-  const phoneValid = /^01[016789][0-9]{7,8}$/.test(digits)
+  const emailValid = EMAIL_RE.test(email.trim())
 
   useEffect(() => () => clearInterval(timerRef.current), [])
 
@@ -228,11 +149,11 @@ function PhoneVerify({ onVerified, disabled, ctaLabel = '인증하기' }) {
   }
 
   async function sendCode() {
-    setError(''); setBusy(true)
+    setError(''); setInfo(''); setBusy(true)
     try {
-      const r = await api.post('/auth/phone/send', { phoneNumber: digits })
+      const r = await api.post('/auth/email/send', { email: email.trim() })
       setSent(true)
-      setDevCode(r.data?.data?.devCode || '')
+      setInfo('인증번호를 메일로 보냈어요. 메일함(스팸함 포함)을 확인하세요.')
       startTimer(r.data?.data?.ttlSeconds || 180)
       setCode('')
     } catch (err) {
@@ -245,10 +166,10 @@ function PhoneVerify({ onVerified, disabled, ctaLabel = '인증하기' }) {
   async function verify() {
     setError(''); setBusy(true)
     try {
-      const r = await api.post('/auth/phone/verify', { phoneNumber: digits, code })
+      const r = await api.post('/auth/email/verify', { email: email.trim(), code })
       setVerified(true)
       clearInterval(timerRef.current)
-      onVerified(r.data?.data?.phoneVerificationToken)
+      onVerified(r.data?.data?.emailVerificationToken)
     } catch (err) {
       setError(err.response?.data?.message || '인증에 실패했어요.')
     } finally {
@@ -263,7 +184,7 @@ function PhoneVerify({ onVerified, disabled, ctaLabel = '인증하기' }) {
     return (
       <div className="rounded-2xl bg-emerald-50 ring-1 ring-emerald-200 px-4 py-3 text-sm text-emerald-700 flex items-center gap-2">
         <span className="w-5 h-5 shrink-0 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[11px] font-bold">✓</span>
-        전화번호 인증 완료
+        이메일 인증 완료
       </div>
     )
   }
@@ -272,16 +193,17 @@ function PhoneVerify({ onVerified, disabled, ctaLabel = '인증하기' }) {
     <div className="space-y-3">
       <div className="flex gap-2">
         <input
-          type="tel"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="휴대폰 번호 (01012345678)"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="가입한 이메일 (name@example.com)"
+          autoComplete="email"
           className="flex-1 px-4 py-3.5 rounded-2xl bg-white ring-1 ring-slate-200 focus:ring-2 focus:ring-emerald-400 outline-none text-sm transition-all"
         />
         <button
           type="button"
           onClick={sendCode}
-          disabled={!phoneValid || busy || disabled}
+          disabled={!emailValid || busy || disabled}
           className="px-4 rounded-2xl bg-slate-800 text-white text-sm font-bold whitespace-nowrap disabled:opacity-40"
         >
           {sent ? '재전송' : '인증요청'}
@@ -290,9 +212,9 @@ function PhoneVerify({ onVerified, disabled, ctaLabel = '인증하기' }) {
 
       {sent && (
         <>
-          {devCode && (
-            <div className="rounded-2xl bg-amber-50 ring-1 ring-amber-200 px-4 py-2.5 text-xs text-amber-700">
-              데모용 인증번호: <span className="font-bold tracking-widest">{devCode}</span>
+          {info && (
+            <div className="rounded-2xl bg-sky-50 ring-1 ring-sky-200 px-4 py-2.5 text-xs text-sky-700">
+              {info}
             </div>
           )}
           <div className="flex gap-2 items-center">

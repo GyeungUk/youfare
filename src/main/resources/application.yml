@@ -6,6 +6,25 @@ server:
   forward-headers-strategy: framework
 
 spring:
+  # 이메일 인증번호 발송 (Gmail SMTP). MAIL_USERNAME=gmail주소, MAIL_PASSWORD=앱 비밀번호(16자리).
+  # 일반 비밀번호가 아니라 반드시 '앱 비밀번호'를 써야 한다(2단계 인증 필요).
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+        # 연결/응답 지연 시 너무 오래 매달리지 않게 타임아웃(ms).
+        transport:
+          protocol: smtp
+    default-encoding: UTF-8
+
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:youfare}
     username: ${DB_USERNAME:youfare}
@@ -91,13 +110,11 @@ chat:
   # 비로그인(게스트) 1일 AI 상담 허용 횟수 (IP 기준). 로그인 유저는 제한 없음.
   guest-daily-limit: ${CHAT_GUEST_DAILY_LIMIT:5}
 
-# 인증(전화번호 목업) 정책
+# 이메일 인증 정책
 auth:
-  phone:
-    # 데모용 인증번호를 HTTP 응답(devCode)으로 노출할지 여부.
-    # 운영 기본 false — true면 타인 번호의 인증번호를 누구나 받아 계정 탈취가 가능하다.
-    # 로컬 데모에서만 AUTH_PHONE_EXPOSE_DEV_CODE=true 로 켠다(코드는 서버 로그로도 확인 가능).
-    expose-dev-code: ${AUTH_PHONE_EXPOSE_DEV_CODE:false}
+  email:
+    # 인증번호 유효시간(초). 기본 3분.
+    code-ttl-seconds: ${AUTH_EMAIL_CODE_TTL_SECONDS:180}
 
 # 관리자 API 보호
 admin:

@@ -32,6 +32,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
 
+    // 이메일 인증번호 발송 (Gmail SMTP). JavaMailSender 제공.
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+
     // PostgreSQL
     runtimeOnly 'org.postgresql:postgresql'
 

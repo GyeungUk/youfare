@@ -56,6 +56,14 @@ services:
       - key: PUBLIC_DATA_API_KEY
         sync: false
 
+      # --- 이메일 인증(회원가입/비번재설정 OTP 발송, Gmail SMTP) ---
+      # Gmail 계정 → 보안 → 2단계 인증 ON → '앱 비밀번호' 16자리 발급해서 MAIL_PASSWORD에 입력.
+      # 둘 다 비우면 /auth/email/send 가 MAIL_SEND_FAILED 로 실패한다.
+      - key: MAIL_USERNAME
+        sync: false           # 예) yourname@gmail.com
+      - key: MAIL_PASSWORD
+        sync: false           # Gmail 앱 비밀번호 16자리
+
       # --- 선택 ---
       - key: ADMIN_API_KEY
         sync: false           # 수동 동기화 안 쓰면 비워둬도 됨(엔드포인트 차단됨)

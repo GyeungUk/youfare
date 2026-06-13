@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import api from '../api/axios'
 import { completeLogin } from '../api/loginFlow'
 
-const STEPS = ['약관 동의', '전화번호 인증', '계정 정보']
+const STEPS = ['약관 동의', '이메일 인증', '계정 정보']
 
 export default function SignupPage() {
   const navigate = useNavigate()
@@ -84,11 +84,11 @@ function Stepper({ step }) {
 function SignupFlow({ step, setStep, redirect, navigate }) {
   // 약관
   const [agree, setAgree] = useState({ terms: false, privacy: false, marketing: false })
-  // 전화 인증
-  const [phone, setPhone] = useState('')
-  const [phoneToken, setPhoneToken] = useState('')
+  // 이메일 인증
+  const [email, setEmail] = useState('')
+  const [emailToken, setEmailToken] = useState('')
   // 계정
-  const [account, setAccount] = useState({ email: '', password: '', password2: '', nickname: '' })
+  const [account, setAccount] = useState({ password: '', password2: '', nickname: '' })
   const [submitError, setSubmitError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -101,11 +101,10 @@ function SignupFlow({ step, setStep, redirect, navigate }) {
     setSubmitting(true)
     try {
       const r = await api.post('/auth/signup', {
-        email: account.email,
+        email: email.trim(),
         password: account.password,
         nickname: account.nickname,
-        phoneNumber: phone.replace(/[^0-9]/g, ''),
-        phoneVerificationToken: phoneToken,
+        emailVerificationToken: emailToken,
         agreeTerms: agree.terms,
         agreePrivacy: agree.privacy,
         agreeMarketing: agree.marketing,
@@ -122,15 +121,16 @@ function SignupFlow({ step, setStep, redirect, navigate }) {
   }
   if (step === 1) {
     return (
-      <PhoneStep
-        phone={phone} setPhone={setPhone}
-        phoneToken={phoneToken} setPhoneToken={setPhoneToken}
+      <EmailStep
+        email={email} setEmail={setEmail}
+        emailToken={emailToken} setEmailToken={setEmailToken}
         onNext={() => setStep(2)}
       />
     )
   }
   return (
     <AccountStep
+      email={email}
       account={account} setAccount={setAccount}
       onSubmit={submitSignup} submitting={submitting} error={submitError}
     />
@@ -212,19 +212,20 @@ function Check({ checked, small }) {
   )
 }
 
-/* ---------- STEP 2: 전화번호 인증 ---------- */
-function PhoneStep({ phone, setPhone, phoneToken, setPhoneToken, onNext }) {
+/* ---------- STEP 2: 이메일 인증 ---------- */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function EmailStep({ email, setEmail, emailToken, setEmailToken, onNext }) {
   const [code, setCode] = useState('')
   const [sent, setSent] = useState(false)
-  const [devCode, setDevCode] = useState('')
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
   const [busy, setBusy] = useState(false)
   const [secondsLeft, setSecondsLeft] = useState(0)
   const timerRef = useRef(null)
 
-  const verified = !!phoneToken
-  const digits = phone.replace(/[^0-9]/g, '')
-  const phoneValid = /^01[016789][0-9]{7,8}$/.test(digits)
+  const verified = !!emailToken
+  const emailValid = EMAIL_RE.test(email.trim())
 
   useEffect(() => () => clearInterval(timerRef.current), [])
 
@@ -240,14 +241,14 @@ function PhoneStep({ phone, setPhone, phoneToken, setPhoneToken, onNext }) {
   }
 
   async function sendCode() {
-    setError(''); setBusy(true)
+    setError(''); setInfo(''); setBusy(true)
     try {
-      const r = await api.post('/auth/phone/send', { phoneNumber: digits })
+      const r = await api.post('/auth/email/send', { email: email.trim() })
       setSent(true)
-      setDevCode(r.data?.data?.devCode || '')
+      setInfo('인증번호를 메일로 보냈어요. 메일함(스팸함 포함)을 확인하세요.')
       startTimer(r.data?.data?.ttlSeconds || 180)
       setCode('')
-      setPhoneToken('')
+      setEmailToken('')
     } catch (err) {
       setError(err.response?.data?.message || '인증번호 발송에 실패했어요.')
     } finally {
@@ -258,8 +259,8 @@ function PhoneStep({ phone, setPhone, phoneToken, setPhoneToken, onNext }) {
   async function verify() {
     setError(''); setBusy(true)
     try {
-      const r = await api.post('/auth/phone/verify', { phoneNumber: digits, code })
-      setPhoneToken(r.data?.data?.phoneVerificationToken)
+      const r = await api.post('/auth/email/verify', { email: email.trim(), code })
+      setEmailToken(r.data?.data?.emailVerificationToken)
       clearInterval(timerRef.current)
     } catch (err) {
       setError(err.response?.data?.message || '인증에 실패했어요.')
@@ -273,19 +274,20 @@ function PhoneStep({ phone, setPhone, phoneToken, setPhoneToken, onNext }) {
 
   return (
     <div className="space-y-3">
-      <label className="block text-sm font-medium text-slate-600 px-1">휴대폰 번호</label>
+      <label className="block text-sm font-medium text-slate-600 px-1">이메일</label>
       <div className="flex gap-2">
         <input
-          type="tel"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="01012345678"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="name@example.com"
+          autoComplete="email"
           disabled={verified}
           className="flex-1 px-4 py-3.5 rounded-2xl bg-white ring-1 ring-slate-200 focus:ring-2 focus:ring-emerald-400 outline-none text-sm transition-all disabled:bg-slate-50 disabled:text-slate-400"
         />
         <button
           onClick={sendCode}
-          disabled={!phoneValid || verified || busy}
+          disabled={!emailValid || verified || busy}
           className="px-4 rounded-2xl bg-slate-800 text-white text-sm font-bold whitespace-nowrap disabled:opacity-40"
         >
           {sent ? '재전송' : '인증요청'}
@@ -294,10 +296,9 @@ function PhoneStep({ phone, setPhone, phoneToken, setPhoneToken, onNext }) {
 
       {sent && !verified && (
         <>
-          {/* 데모 안내: 실제 SMS 대신 발급된 코드를 노출 */}
-          {devCode && (
-            <div className="rounded-2xl bg-amber-50 ring-1 ring-amber-200 px-4 py-2.5 text-xs text-amber-700">
-              데모용 인증번호: <span className="font-bold tracking-widest">{devCode}</span>
+          {info && (
+            <div className="rounded-2xl bg-sky-50 ring-1 ring-sky-200 px-4 py-2.5 text-xs text-sky-700">
+              {info}
             </div>
           )}
           <div className="flex gap-2 items-center">
@@ -330,7 +331,7 @@ function PhoneStep({ phone, setPhone, phoneToken, setPhoneToken, onNext }) {
 
       {verified && (
         <div className="rounded-2xl bg-emerald-50 ring-1 ring-emerald-200 px-4 py-3 text-sm text-emerald-700 flex items-center gap-2">
-          <Check checked small /> 전화번호 인증 완료
+          <Check checked small /> 이메일 인증 완료
         </div>
       )}
 
@@ -348,15 +349,11 @@ function PhoneStep({ phone, setPhone, phoneToken, setPhoneToken, onNext }) {
 }
 
 /* ---------- STEP 3: 계정 정보 ---------- */
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-function AccountStep({ account, setAccount, onSubmit, submitting, error }) {
+function AccountStep({ email, account, setAccount, onSubmit, submitting, error }) {
   const set = (k) => (e) => setAccount({ ...account, [k]: e.target.value })
-  const emailValid = EMAIL_RE.test(account.email)
-  const emailInvalid = account.email.length > 0 && !emailValid
   const pwMismatch = account.password2.length > 0 && account.password !== account.password2
   const canSubmit =
-    emailValid && account.password.length >= 8 && account.nickname && !pwMismatch && !submitting
+    account.password.length >= 8 && account.nickname && !pwMismatch && !submitting
 
   return (
     <form
@@ -364,17 +361,10 @@ function AccountStep({ account, setAccount, onSubmit, submitting, error }) {
       noValidate
       className="space-y-3"
     >
-      <div>
-        <input
-          type="email" value={account.email} onChange={set('email')}
-          placeholder="이메일" autoComplete="email" aria-invalid={emailInvalid}
-          className={`w-full px-4 py-3.5 rounded-2xl bg-white ring-1 outline-none text-sm focus:ring-2 transition-all ${
-            emailInvalid ? 'ring-red-300 focus:ring-red-400' : 'ring-slate-200 focus:ring-emerald-400'
-          }`}
-        />
-        <FieldError show={emailInvalid}>
-          올바른 이메일 형식이 아니에요. 예: <span className="font-semibold">name@example.com</span>
-        </FieldError>
+      {/* 인증 완료된 이메일(읽기 전용 표시) */}
+      <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-emerald-50 ring-1 ring-emerald-200 text-sm text-emerald-700">
+        <Check checked small />
+        <span className="truncate">{email}</span>
       </div>
 
       <input

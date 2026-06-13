@@ -122,10 +122,8 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="flex items-center justify-center gap-3 mt-4 text-sm text-slate-500">
-            <Link to="/find-account" className="hover:text-emerald-600 transition-colors">아이디 찾기</Link>
-            <span className="text-slate-300">|</span>
-            <Link to="/find-account?tab=password" className="hover:text-emerald-600 transition-colors">비밀번호 찾기</Link>
+          <div className="flex items-center justify-center mt-4 text-sm text-slate-500">
+            <Link to="/find-account" className="hover:text-emerald-600 transition-colors">비밀번호 찾기</Link>
           </div>
 
           <p className="text-center text-sm text-slate-500 mt-5">

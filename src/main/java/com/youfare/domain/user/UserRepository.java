@@ -14,11 +14,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByEmailAndProvider(String email, Provider provider);
 
-    Optional<User> findByPhoneNumberAndProvider(String phoneNumber, Provider provider);
-
     boolean existsByEmailAndProvider(String email, Provider provider);
-
-    boolean existsByPhoneNumberAndProvider(String phoneNumber, Provider provider);
 
     /**
      * 포인트 적립 시 race condition 방지용 비관적 락 조회
