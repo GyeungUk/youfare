@@ -9,7 +9,7 @@ export default function LoginPage() {
   const hasError = params.get('error') != null
   const redirect = params.get('redirect')
 
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [formError, setFormError] = useState('')
@@ -26,7 +26,7 @@ export default function LoginPage() {
     setFormError('')
     setLoading(true)
     try {
-      const r = await api.post('/auth/login', { email, password })
+      const r = await api.post('/auth/login', { username, password })
       await completeLogin(r.data?.data?.accessToken, navigate, redirect)
     } catch (err) {
       setFormError(err.response?.data?.message || '로그인에 실패했어요.')
@@ -71,11 +71,11 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="이메일"
-              autoComplete="email"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="아이디"
+              autoComplete="username"
               required
               className="w-full px-4 py-3.5 rounded-2xl bg-white ring-1 ring-slate-200 focus:ring-2 focus:ring-emerald-400 outline-none text-sm transition-all"
             />

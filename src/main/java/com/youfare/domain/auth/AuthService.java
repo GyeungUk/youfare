@@ -32,6 +32,7 @@ public class AuthService {
         }
 
         String email = normalizeEmail(request.getEmail());
+        String username = normalizeUsername(request.getUsername());
 
         // 1. 이메일 인증 토큰 검증 — 토큰이 가리키는 이메일과 가입 이메일이 일치해야 함
         verifyEmailToken(request.getEmailVerificationToken(), email);
@@ -40,9 +41,13 @@ public class AuthService {
         if (userRepository.existsByEmailAndProvider(email, Provider.LOCAL)) {
             throw new BusinessException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
+        if (userRepository.existsByUsernameAndProvider(username, Provider.LOCAL)) {
+            throw new BusinessException(ErrorCode.USERNAME_ALREADY_EXISTS);
+        }
 
         User user = User.ofLocal(
                 email,
+                username,
                 passwordEncoder.encode(request.getPassword()),
                 request.getNickname().trim()
         );
@@ -52,6 +57,7 @@ public class AuthService {
             //    saveAndFlush로 즉시 INSERT를 발생시켜 여기서 예외를 잡는다(커밋 시점 누락 방지).
             userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException e) {
+            // 이메일·아이디 어느 쪽 제약 위반인지 구분이 어려워 둘 다 안내 가능한 메시지로 통일.
             throw new BusinessException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
 
@@ -94,10 +100,10 @@ public class AuthService {
         }
     }
 
-    /** 폼 로그인 — 이메일/비밀번호 검증. 이메일 미존재·비밀번호 불일치 모두 동일 메시지로 응답해 계정 존재 여부 노출 방지 */
+    /** 폼 로그인 — 아이디/비밀번호 검증. 아이디 미존재·비밀번호 불일치 모두 동일 메시지로 응답해 계정 존재 여부 노출 방지 */
     @Transactional(readOnly = true)
     public TokenResponse login(LoginRequest request) {
-        User user = userRepository.findByEmailAndProvider(normalizeEmail(request.getEmail()), Provider.LOCAL)
+        User user = userRepository.findByUsernameAndProvider(normalizeUsername(request.getUsername()), Provider.LOCAL)
                 .orElseThrow(() -> new BusinessException(ErrorCode.LOGIN_FAILED));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
@@ -110,5 +116,10 @@ public class AuthService {
     /** 대소문자·공백 차이로 같은 메일이 다른 계정이 되는 것을 막기 위해 정규화 */
     private String normalizeEmail(String email) {
         return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    /** 아이디도 대소문자·공백 차이로 중복/로그인 실패가 나지 않도록 동일하게 정규화 */
+    private String normalizeUsername(String username) {
+        return username == null ? null : username.trim().toLowerCase(Locale.ROOT);
     }
 }

@@ -49,10 +49,11 @@ class AuthServiceTest {
         authService = new AuthService(userRepository, passwordEncoder, jwtProvider);
     }
 
-    private SignupRequest signupRequest(String email, String password, String nickname,
+    private SignupRequest signupRequest(String email, String username, String password, String nickname,
                                         String emailToken, boolean agreeTerms, boolean agreePrivacy) {
         SignupRequest req = new SignupRequest();
         ReflectionTestUtils.setField(req, "email", email);
+        ReflectionTestUtils.setField(req, "username", username);
         ReflectionTestUtils.setField(req, "password", password);
         ReflectionTestUtils.setField(req, "nickname", nickname);
         ReflectionTestUtils.setField(req, "emailVerificationToken", emailToken);
@@ -63,12 +64,12 @@ class AuthServiceTest {
 
     /** 약관 동의 + 이메일 인증이 모두 통과되는 정상 요청 */
     private SignupRequest validSignup(String email) {
-        return signupRequest(email, "password123", "닉", EMAIL_TOKEN, true, true);
+        return signupRequest(email, "tester1", "password123", "닉", EMAIL_TOKEN, true, true);
     }
 
-    private LoginRequest loginRequest(String email, String password) {
+    private LoginRequest loginRequest(String username, String password) {
         LoginRequest req = new LoginRequest();
-        ReflectionTestUtils.setField(req, "email", email);
+        ReflectionTestUtils.setField(req, "username", username);
         ReflectionTestUtils.setField(req, "password", password);
         return req;
     }
@@ -85,8 +86,8 @@ class AuthServiceTest {
         });
         given(jwtProvider.generateToken(1L)).willReturn("jwt-token");
 
-        // 입력 이메일은 대소문자/공백이 섞여도 토큰 이메일과 정규화 후 일치해야 한다.
-        SignupRequest req = signupRequest("  USER@Test.com ", "password123", " 길동 ", EMAIL_TOKEN, true, true);
+        // 입력 이메일/아이디는 대소문자·공백이 섞여도 정규화돼 저장돼야 한다.
+        SignupRequest req = signupRequest("  USER@Test.com ", "  Tester_01 ", "password123", " 길동 ", EMAIL_TOKEN, true, true);
         TokenResponse res = authService.signup(req);
 
         assertThat(res.getUserId()).isEqualTo(1L);
@@ -96,6 +97,7 @@ class AuthServiceTest {
         verify(userRepository).saveAndFlush(captor.capture());
         User saved = captor.getValue();
         assertThat(saved.getEmail()).isEqualTo(EMAIL);
+        assertThat(saved.getUsername()).isEqualTo("tester_01");
         assertThat(saved.getProvider()).isEqualTo(Provider.LOCAL);
         assertThat(saved.getNickname()).isEqualTo("길동");
         assertThat(saved.getPassword()).isNotEqualTo("password123");
@@ -105,7 +107,7 @@ class AuthServiceTest {
     @Test
     @DisplayName("회원가입 실패 — 필수 약관 미동의")
     void signup_termsNotAgreed() {
-        SignupRequest req = signupRequest(EMAIL, "password123", "닉", EMAIL_TOKEN, true, false);
+        SignupRequest req = signupRequest(EMAIL, "tester1", "password123", "닉", EMAIL_TOKEN, true, false);
 
         assertThatThrownBy(() -> authService.signup(req))
                 .isInstanceOf(BusinessException.class)
@@ -148,6 +150,20 @@ class AuthServiceTest {
     }
 
     @Test
+    @DisplayName("회원가입 실패 — 이미 사용 중인 아이디")
+    void signup_duplicateUsername() {
+        given(jwtProvider.getVerifiedEmail(EMAIL_TOKEN)).willReturn(EMAIL);
+        given(userRepository.existsByEmailAndProvider(EMAIL, Provider.LOCAL)).willReturn(false);
+        given(userRepository.existsByUsernameAndProvider("tester1", Provider.LOCAL)).willReturn(true);
+
+        assertThatThrownBy(() -> authService.signup(validSignup(EMAIL)))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.USERNAME_ALREADY_EXISTS);
+
+        verify(userRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     @DisplayName("회원가입 실패 — 동시 가입 race로 검사를 통과해도 DB 유니크 제약이 막는다")
     void signup_raceConditionHandledAsDuplicate() {
         given(jwtProvider.getVerifiedEmail(EMAIL_TOKEN)).willReturn("race@test.com");
@@ -161,14 +177,15 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("로그인 성공 — 비밀번호 매칭 후 토큰 발급")
+    @DisplayName("로그인 성공 — 아이디 정규화 후 비밀번호 매칭, 토큰 발급")
     void login_success() {
-        User user = User.ofLocal(EMAIL, passwordEncoder.encode("password123"), "닉");
+        User user = User.ofLocal(EMAIL, "tester1", passwordEncoder.encode("password123"), "닉");
         ReflectionTestUtils.setField(user, "id", 7L);
-        given(userRepository.findByEmailAndProvider(EMAIL, Provider.LOCAL)).willReturn(Optional.of(user));
+        given(userRepository.findByUsernameAndProvider("tester1", Provider.LOCAL)).willReturn(Optional.of(user));
         given(jwtProvider.generateToken(7L)).willReturn("jwt-7");
 
-        TokenResponse res = authService.login(loginRequest("USER@test.com", "password123"));
+        // 입력 아이디는 대소문자/공백이 섞여도 정규화 후 조회돼야 한다.
+        TokenResponse res = authService.login(loginRequest(" Tester1 ", "password123"));
 
         assertThat(res.getUserId()).isEqualTo(7L);
         assertThat(res.getAccessToken()).isEqualTo("jwt-7");
@@ -177,10 +194,10 @@ class AuthServiceTest {
     @Test
     @DisplayName("로그인 실패 — 비밀번호 불일치 (LOGIN_FAILED)")
     void login_wrongPassword() {
-        User user = User.ofLocal(EMAIL, passwordEncoder.encode("password123"), "닉");
-        given(userRepository.findByEmailAndProvider(EMAIL, Provider.LOCAL)).willReturn(Optional.of(user));
+        User user = User.ofLocal(EMAIL, "tester1", passwordEncoder.encode("password123"), "닉");
+        given(userRepository.findByUsernameAndProvider("tester1", Provider.LOCAL)).willReturn(Optional.of(user));
 
-        assertThatThrownBy(() -> authService.login(loginRequest(EMAIL, "wrongpass")))
+        assertThatThrownBy(() -> authService.login(loginRequest("tester1", "wrongpass")))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.LOGIN_FAILED);
 
@@ -188,11 +205,11 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("로그인 실패 — 존재하지 않는 이메일도 동일한 LOGIN_FAILED로 응답(계정 존재 노출 방지)")
-    void login_unknownEmail() {
-        given(userRepository.findByEmailAndProvider("none@test.com", Provider.LOCAL)).willReturn(Optional.empty());
+    @DisplayName("로그인 실패 — 존재하지 않는 아이디도 동일한 LOGIN_FAILED로 응답(계정 존재 노출 방지)")
+    void login_unknownUsername() {
+        given(userRepository.findByUsernameAndProvider("none", Provider.LOCAL)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> authService.login(loginRequest("none@test.com", "password123")))
+        assertThatThrownBy(() -> authService.login(loginRequest("none", "password123")))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.LOGIN_FAILED);
     }
@@ -207,7 +224,7 @@ class AuthServiceTest {
     @Test
     @DisplayName("비밀번호 재설정 성공 — 이메일 인증 토큰으로 계정을 찾아 새 비밀번호로 교체")
     void resetPassword_success() {
-        User user = User.ofLocal(EMAIL, passwordEncoder.encode("oldpassword"), "닉");
+        User user = User.ofLocal(EMAIL, "tester1", passwordEncoder.encode("oldpassword"), "닉");
         given(jwtProvider.getVerifiedEmail(EMAIL_TOKEN)).willReturn(EMAIL);
         given(userRepository.findByEmailAndProvider(EMAIL, Provider.LOCAL)).willReturn(Optional.of(user));
 

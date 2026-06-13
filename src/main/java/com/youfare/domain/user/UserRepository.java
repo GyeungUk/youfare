@@ -16,6 +16,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByEmailAndProvider(String email, Provider provider);
 
+    Optional<User> findByUsernameAndProvider(String username, Provider provider);
+
+    boolean existsByUsernameAndProvider(String username, Provider provider);
+
     /**
      * 포인트 적립 시 race condition 방지용 비관적 락 조회
      * SELECT ... FOR UPDATE → 동시 요청을 순차 처리
