@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import api from '../api/axios'
+import PasswordInput from '../components/PasswordInput'
 
-// 비밀번호 재설정. 가입 이메일로 인증번호를 받아 본인을 확인한 뒤 새 비밀번호로 교체한다.
-//  - 회원가입과 동일한 /auth/email/send · /auth/email/verify 흐름을 재사용한다.
-//  - (아이디=이메일 이므로 '아이디 찾기'는 제공하지 않는다.)
+// 계정 찾기. 가입 이메일로 인증번호를 받아 본인을 확인한 뒤,
+//  - '아이디 찾기': 그 이메일로 가입한 아이디를 보여주고
+//  - '비밀번호 재설정': 새 비밀번호로 교체한다.
+// 두 흐름 모두 회원가입과 동일한 /auth/email/send · /auth/email/verify 인증을 재사용한다.
 export default function FindAccountPage() {
   const navigate = useNavigate()
+  const [tab, setTab] = useState('id') // 'id' | 'pw'
 
   return (
     <div className="relative min-h-screen flex items-center justify-center px-4 py-10 overflow-hidden bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50">
@@ -27,19 +30,92 @@ export default function FindAccountPage() {
             로그인으로
           </button>
 
-          <div className="text-center mb-7">
-            <h1 className="text-2xl font-black text-gradient">비밀번호 재설정</h1>
-            <p className="text-slate-500 mt-2 text-sm">가입한 이메일로 인증한 뒤 새 비밀번호를 설정해요</p>
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-black text-gradient">{tab === 'id' ? '아이디 찾기' : '비밀번호 재설정'}</h1>
+            <p className="text-slate-500 mt-2 text-sm">
+              {tab === 'id'
+                ? '가입한 이메일로 인증하면 아이디를 알려드려요'
+                : '가입한 이메일로 인증한 뒤 새 비밀번호를 설정해요'}
+            </p>
           </div>
 
-          <ResetPasswordFlow navigate={navigate} />
+          {/* 탭 전환 */}
+          <div className="flex gap-1 p-1 bg-slate-100 rounded-2xl mb-6">
+            <TabButton active={tab === 'id'} onClick={() => setTab('id')}>아이디 찾기</TabButton>
+            <TabButton active={tab === 'pw'} onClick={() => setTab('pw')}>비밀번호 재설정</TabButton>
+          </div>
+
+          {tab === 'id'
+            ? <FindUsernameFlow navigate={navigate} />
+            : <ResetPasswordFlow navigate={navigate} />}
         </div>
 
         <p className="text-center text-sm text-slate-500 mt-5">
-          비밀번호가 기억났나요?{' '}
+          계정이 기억났나요?{' '}
           <Link to="/login" className="font-bold text-emerald-600 hover:text-emerald-700">로그인</Link>
         </p>
       </div>
+    </div>
+  )
+}
+
+function TabButton({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+        active ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+/* ---------- 아이디 찾기 ---------- */
+function FindUsernameFlow({ navigate }) {
+  const [username, setUsername] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  // 이메일 인증을 마치면 토큰으로 아이디를 조회한다.
+  async function handleVerified(token) {
+    setError(''); setLoading(true)
+    try {
+      const r = await api.post('/auth/find-username', { emailVerificationToken: token })
+      const found = r.data?.data?.username
+      if (found) setUsername(found)
+      else setError('이 이메일로 가입한 아이디를 찾을 수 없어요.')
+    } catch (err) {
+      setError(err.response?.data?.message || '아이디를 찾지 못했어요.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (username) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-2xl bg-emerald-50 ring-1 ring-emerald-200 px-5 py-6 text-center">
+          <p className="text-sm text-slate-500 mb-1.5">회원님의 아이디는</p>
+          <p className="text-xl font-black text-emerald-700 break-all">{username}</p>
+        </div>
+        <button
+          onClick={() => navigate('/login')}
+          className="w-full bg-gradient-to-br from-emerald-500 to-teal-600 hover:brightness-105 text-white font-bold py-4 rounded-2xl transition-all hover:-translate-y-0.5 shadow-sm text-base"
+        >
+          로그인하러 가기
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      <EmailVerify onVerified={handleVerified} ctaLabel="아이디 찾기" disabled={loading} />
+      {loading && <p className="text-sm text-slate-500 px-1">아이디 조회 중...</p>}
+      {error && <p className="text-sm text-red-600 px-1">{error}</p>}
     </div>
   )
 }
@@ -80,25 +156,18 @@ function ResetPasswordFlow({ navigate }) {
       {/* 이메일 인증을 마쳐야 새 비밀번호 입력을 연다 */}
       {emailToken && (
         <>
-          <input
-            type="password"
+          <PasswordInput
             value={pw}
             onChange={(e) => setPw(e.target.value)}
             placeholder="새 비밀번호 (8자 이상)"
-            autoComplete="new-password"
             required
-            className="w-full px-4 py-3.5 rounded-2xl bg-white ring-1 ring-slate-200 focus:ring-2 focus:ring-emerald-400 outline-none text-sm transition-all"
           />
-          <input
-            type="password"
+          <PasswordInput
             value={pw2}
             onChange={(e) => setPw2(e.target.value)}
             placeholder="새 비밀번호 확인"
-            autoComplete="new-password"
+            invalid={pwMismatch}
             required
-            className={`w-full px-4 py-3.5 rounded-2xl bg-white ring-1 outline-none text-sm focus:ring-2 ${
-              pwMismatch ? 'ring-red-300 focus:ring-red-400' : 'ring-slate-200 focus:ring-emerald-400'
-            }`}
           />
           {pwMismatch && <p className="text-xs text-red-500 px-1">비밀번호가 일치하지 않습니다.</p>}
         </>

@@ -65,6 +65,20 @@ public class AuthService {
     }
 
     /**
+     * 아이디 찾기 — 이메일 인증을 마친 토큰으로 그 이메일로 가입한 LOCAL 계정의 아이디를 돌려준다.
+     * 본인 확인은 이메일 OTP가 책임진다(인증 안 된 이메일로는 조회 불가).
+     */
+    @Transactional(readOnly = true)
+    public String findUsername(String emailVerificationToken) {
+        String email = verifiedEmailFromToken(emailVerificationToken);
+
+        User user = userRepository.findByEmailAndProvider(email, Provider.LOCAL)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND));
+
+        return user.getUsername();
+    }
+
+    /**
      * 비밀번호 재설정 — 이메일 인증을 마친 이메일로 가입한 LOCAL 계정을 찾아 새 비밀번호로 교체.
      * 본인 확인은 이메일 OTP가 책임진다.
      */

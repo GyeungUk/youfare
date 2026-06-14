@@ -58,6 +58,17 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok(authService.login(request)));
     }
 
+    @Operation(summary = "아이디 찾기",
+            description = "이메일 인증을 마친 토큰으로, 그 이메일로 가입한 계정의 아이디를 반환합니다.")
+    @PostMapping("/find-username")
+    public ResponseEntity<ApiResponse<FindUsernameResponse>> findUsername(
+            @Valid @RequestBody FindUsernameRequest request) {
+        String username = authService.findUsername(request.getEmailVerificationToken());
+        return ResponseEntity.ok(ApiResponse.ok(FindUsernameResponse.builder()
+                .username(username)
+                .build()));
+    }
+
     @Operation(summary = "비밀번호 재설정",
             description = "이메일 인증을 마친 토큰으로 가입한 계정을 찾아 새 비밀번호로 교체합니다.")
     @PostMapping("/reset-password")

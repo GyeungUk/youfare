@@ -214,6 +214,37 @@ class AuthServiceTest {
                 .extracting("errorCode").isEqualTo(ErrorCode.LOGIN_FAILED);
     }
 
+    @Test
+    @DisplayName("아이디 찾기 성공 — 인증된 이메일로 가입한 계정의 아이디 반환")
+    void findUsername_success() {
+        User user = User.ofLocal(EMAIL, "tester1", passwordEncoder.encode("password123"), "닉");
+        given(jwtProvider.getVerifiedEmail(EMAIL_TOKEN)).willReturn(EMAIL);
+        given(userRepository.findByEmailAndProvider(EMAIL, Provider.LOCAL)).willReturn(Optional.of(user));
+
+        assertThat(authService.findUsername(EMAIL_TOKEN)).isEqualTo("tester1");
+    }
+
+    @Test
+    @DisplayName("아이디 찾기 실패 — 해당 이메일로 가입한 LOCAL 계정 없음(ACCOUNT_NOT_FOUND)")
+    void findUsername_notFound() {
+        given(jwtProvider.getVerifiedEmail(EMAIL_TOKEN)).willReturn(EMAIL);
+        given(userRepository.findByEmailAndProvider(EMAIL, Provider.LOCAL)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.findUsername(EMAIL_TOKEN))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.ACCOUNT_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("아이디 찾기 실패 — 이메일 인증 토큰 무효(EMAIL_NOT_VERIFIED)")
+    void findUsername_invalidToken() {
+        given(jwtProvider.getVerifiedEmail(EMAIL_TOKEN)).willThrow(new JwtException("bad"));
+
+        assertThatThrownBy(() -> authService.findUsername(EMAIL_TOKEN))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.EMAIL_NOT_VERIFIED);
+    }
+
     private ResetPasswordRequest resetRequest(String emailToken, String newPassword) {
         ResetPasswordRequest req = new ResetPasswordRequest();
         ReflectionTestUtils.setField(req, "emailVerificationToken", emailToken);
