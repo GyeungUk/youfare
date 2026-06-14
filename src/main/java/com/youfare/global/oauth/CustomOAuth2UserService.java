@@ -53,7 +53,9 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
                         return userRepository.save(User.builder()
                                 .socialId(userInfo.getSocialId())
                                 .provider(provider)
-                                .email(userInfo.getEmail())
+                                // 이메일은 소문자로 정규화해 저장한다. LOCAL 계정과 동일한 정규화 규칙을 맞춰
+                                // 같은 이메일의 소셜/폼 계정 교차 조회(아이디찾기·비번재설정 안내)가 일관되게 매칭되게 한다.
+                                .email(normalizeEmail(userInfo.getEmail()))
                                 .nickname(userInfo.getNickname())
                                 .build());
                     });
@@ -72,6 +74,11 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
             throw new OAuth2AuthenticationException(
                     new OAuth2Error("user_processing_failed", e.getMessage(), null), e);
         }
+    }
+
+    /** 대소문자·공백 차이로 같은 메일이 다른 계정처럼 취급되지 않도록 정규화 (AuthService와 동일 규칙). 소셜은 email이 null일 수 있다. */
+    private static String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     private OAuth2UserInfo resolveUserInfo(String registrationId, Map<String, Object> attributes) {

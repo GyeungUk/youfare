@@ -69,6 +69,16 @@ public class AuthController {
                 .build()));
     }
 
+    @Operation(summary = "비밀번호 재설정 가능 여부 확인",
+            description = "이메일 인증 직후 새 비밀번호 입력 전에 호출합니다. 소셜 가입 계정이거나 가입 내역이 없으면 "
+                    + "해당 안내 메시지를 반환해, 비밀번호를 헛입력하기 전에 알려줍니다.")
+    @PostMapping("/reset-password/check")
+    public ResponseEntity<ApiResponse<Void>> checkResettable(
+            @Valid @RequestBody ResetPasswordCheckRequest request) {
+        authService.checkResettable(request.getEmailVerificationToken());
+        return ResponseEntity.ok(ApiResponse.<Void>ok());
+    }
+
     @Operation(summary = "비밀번호 재설정",
             description = "이메일 인증을 마친 토큰으로 가입한 계정을 찾아 새 비밀번호로 교체합니다.")
     @PostMapping("/reset-password")

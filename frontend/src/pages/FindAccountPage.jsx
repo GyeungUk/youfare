@@ -114,9 +114,24 @@ function ResetPasswordFlow({ navigate }) {
   const [pw2, setPw2] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [checking, setChecking] = useState(false)
 
   const pwMismatch = pw2.length > 0 && pw !== pw2
   const canSubmit = emailToken && pw.length >= 8 && !pwMismatch && !submitting
+
+  // 이메일 인증 직후, 새 비밀번호 입력칸을 열기 전에 재설정 가능한 계정인지 먼저 확인한다.
+  // 소셜(네이버/카카오) 가입 계정이면 여기서 안내해, 비밀번호를 헛입력하지 않게 한다.
+  async function handleVerified(token) {
+    setError(''); setChecking(true)
+    try {
+      await api.post('/auth/reset-password/check', { emailVerificationToken: token })
+      setEmailToken(token)
+    } catch (err) {
+      setError(err.response?.data?.message || '비밀번호를 재설정할 수 없는 계정이에요.')
+    } finally {
+      setChecking(false)
+    }
+  }
 
   async function submit(e) {
     e.preventDefault()
@@ -138,9 +153,11 @@ function ResetPasswordFlow({ navigate }) {
 
   return (
     <form onSubmit={submit} className="space-y-3">
-      <EmailVerify onVerified={setEmailToken} ctaLabel="인증하기" />
+      <EmailVerify onVerified={handleVerified} ctaLabel="인증하기" disabled={checking} />
 
-      {/* 이메일 인증을 마쳐야 새 비밀번호 입력을 연다 */}
+      {checking && <p className="text-sm text-slate-500 px-1">계정 확인 중...</p>}
+
+      {/* 이메일 인증 + 재설정 가능 계정 확인까지 마쳐야 새 비밀번호 입력을 연다 */}
       {emailToken && (
         <>
           <PasswordInput

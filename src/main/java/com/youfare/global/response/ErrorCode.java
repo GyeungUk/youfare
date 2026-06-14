@@ -23,6 +23,8 @@ public enum ErrorCode {
     TERMS_NOT_AGREED(HttpStatus.BAD_REQUEST, "A004", "필수 약관에 동의해야 가입할 수 있습니다."),
     ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "A005", "해당 정보로 가입된 계정을 찾을 수 없습니다."),
     USERNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "A006", "이미 사용 중인 아이디입니다."),
+    // 같은 이메일이 소셜(네이버/카카오)로 이미 가입된 경우. 실제 메시지는 provider 이름을 넣어 동적으로 던진다.
+    SOCIAL_ACCOUNT_EXISTS(HttpStatus.CONFLICT, "A007", "소셜 로그인으로 가입된 이메일입니다."),
 
     // Email verification
     EMAIL_CODE_NOT_FOUND(HttpStatus.BAD_REQUEST, "EV001", "인증 요청 내역이 없습니다. 인증번호를 다시 요청해주세요."),

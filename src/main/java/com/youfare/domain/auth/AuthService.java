@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Locale;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +42,9 @@ public class AuthService {
         if (userRepository.existsByEmailAndProvider(email, Provider.LOCAL)) {
             throw new BusinessException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
+        // 같은 이메일이 이미 소셜(네이버/카카오)로 가입돼 있으면 폼 가입을 막고 그 소셜로 로그인하도록 안내.
+        // (이게 없으면 같은 이메일이 LOCAL/소셜 두 계정으로 쪼개져 "내 계정이 둘"이 되는 혼란을 부른다)
+        socialAccountConflict(email).ifPresent(e -> { throw e; });
         if (userRepository.existsByUsernameAndProvider(username, Provider.LOCAL)) {
             throw new BusinessException(ErrorCode.USERNAME_ALREADY_EXISTS);
         }
@@ -73,9 +77,21 @@ public class AuthService {
         String email = verifiedEmailFromToken(emailVerificationToken);
 
         User user = userRepository.findByEmailAndProvider(email, Provider.LOCAL)
-                .orElseThrow(() -> new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND));
+                .orElseThrow(() -> accountNotFoundOrSocial(email));
 
         return user.getUsername();
+    }
+
+    /**
+     * 비밀번호 재설정 가능 여부 사전 확인 — 새 비밀번호 입력 전에 호출한다.
+     * 재설정 가능한 LOCAL 계정이면 정상 반환, 소셜 계정/미존재면 안내 예외를 던져
+     * 사용자가 비밀번호를 헛입력하기 전에 알려준다. (검증 로직은 resetPassword와 동일)
+     */
+    @Transactional(readOnly = true)
+    public void checkResettable(String emailVerificationToken) {
+        String email = verifiedEmailFromToken(emailVerificationToken);
+        userRepository.findByEmailAndProvider(email, Provider.LOCAL)
+                .orElseThrow(() -> accountNotFoundOrSocial(email));
     }
 
     /**
@@ -87,9 +103,28 @@ public class AuthService {
         String email = verifiedEmailFromToken(request.getEmailVerificationToken());
 
         User user = userRepository.findByEmailAndProvider(email, Provider.LOCAL)
-                .orElseThrow(() -> new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND));
+                .orElseThrow(() -> accountNotFoundOrSocial(email));
 
         user.updatePassword(passwordEncoder.encode(request.getNewPassword()));
+    }
+
+    /**
+     * 같은 이메일이 소셜(비-LOCAL)로 가입돼 있으면, 그 provider로 로그인하라는 예외를 Optional로 반환.
+     * 소셜 계정이 없으면 empty. 폼 가입 차단·아이디찾기·비번재설정 안내에 공통으로 쓴다.
+     */
+    private Optional<BusinessException> socialAccountConflict(String email) {
+        return userRepository.findFirstByEmailIgnoreCaseAndProviderNot(email, Provider.LOCAL)
+                .map(social -> {
+                    String name = social.getProvider().getDisplayName();
+                    return new BusinessException(ErrorCode.SOCIAL_ACCOUNT_EXISTS,
+                            name + " 로그인으로 가입된 이메일이에요. " + name + "로 로그인해 주세요.");
+                });
+    }
+
+    /** LOCAL 계정을 못 찾았을 때: 소셜 계정이 있으면 그 안내를, 없으면 ACCOUNT_NOT_FOUND를 돌려준다. */
+    private BusinessException accountNotFoundOrSocial(String email) {
+        return socialAccountConflict(email)
+                .orElseGet(() -> new BusinessException(ErrorCode.ACCOUNT_NOT_FOUND));
     }
 
     /** 이메일 인증 토큰을 검증하고 정규화된 이메일을 반환 (실패 시 EMAIL_NOT_VERIFIED) */
