@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import api from '../api/axios'
 import PasswordInput from '../components/PasswordInput'
 
 // 계정 찾기. 가입 이메일로 인증번호를 받아 본인을 확인한 뒤,
-//  - '아이디 찾기': 그 이메일로 가입한 아이디를 보여주고
-//  - '비밀번호 재설정': 새 비밀번호로 교체한다.
+//  - 아이디 찾기(?mode=id): 그 이메일로 가입한 아이디를 보여주고
+//  - 비밀번호 재설정(기본): 새 비밀번호로 교체한다.
+// 로그인 페이지에서 '아이디 찾기'/'비밀번호 찾기' 각각의 링크로 진입한다.
 // 두 흐름 모두 회원가입과 동일한 /auth/email/send · /auth/email/verify 인증을 재사용한다.
 export default function FindAccountPage() {
   const navigate = useNavigate()
-  const [tab, setTab] = useState('id') // 'id' | 'pw'
+  const [params] = useSearchParams()
+  const mode = params.get('mode') === 'id' ? 'id' : 'pw'
 
   return (
     <div className="relative min-h-screen flex items-center justify-center px-4 py-10 overflow-hidden bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50">
@@ -30,46 +32,31 @@ export default function FindAccountPage() {
             로그인으로
           </button>
 
-          <div className="text-center mb-6">
-            <h1 className="text-2xl font-black text-gradient">{tab === 'id' ? '아이디 찾기' : '비밀번호 재설정'}</h1>
+          <div className="text-center mb-7">
+            <h1 className="text-2xl font-black text-gradient">{mode === 'id' ? '아이디 찾기' : '비밀번호 재설정'}</h1>
             <p className="text-slate-500 mt-2 text-sm">
-              {tab === 'id'
+              {mode === 'id'
                 ? '가입한 이메일로 인증하면 아이디를 알려드려요'
                 : '가입한 이메일로 인증한 뒤 새 비밀번호를 설정해요'}
             </p>
           </div>
 
-          {/* 탭 전환 */}
-          <div className="flex gap-1 p-1 bg-slate-100 rounded-2xl mb-6">
-            <TabButton active={tab === 'id'} onClick={() => setTab('id')}>아이디 찾기</TabButton>
-            <TabButton active={tab === 'pw'} onClick={() => setTab('pw')}>비밀번호 재설정</TabButton>
-          </div>
-
-          {tab === 'id'
+          {mode === 'id'
             ? <FindUsernameFlow navigate={navigate} />
             : <ResetPasswordFlow navigate={navigate} />}
         </div>
 
         <p className="text-center text-sm text-slate-500 mt-5">
-          계정이 기억났나요?{' '}
-          <Link to="/login" className="font-bold text-emerald-600 hover:text-emerald-700">로그인</Link>
+          {mode === 'id' ? (
+            <>비밀번호를 잊으셨나요?{' '}
+              <Link to="/find-account" className="font-bold text-emerald-600 hover:text-emerald-700">비밀번호 재설정</Link></>
+          ) : (
+            <>아이디가 기억나지 않나요?{' '}
+              <Link to="/find-account?mode=id" className="font-bold text-emerald-600 hover:text-emerald-700">아이디 찾기</Link></>
+          )}
         </p>
       </div>
     </div>
-  )
-}
-
-function TabButton({ active, onClick, children }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
-        active ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-      }`}
-    >
-      {children}
-    </button>
   )
 }
 
