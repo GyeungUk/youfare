@@ -37,7 +37,7 @@ class EmailVerificationServiceTest {
     @BeforeEach
     void setUp() {
         service = new EmailVerificationService(
-                jwtProvider, brevoWebClient, "xkeysib-test", "noreply@test.com", "YouFare", 180L);
+                jwtProvider, brevoWebClient, "xkeysib-test", "noreply@test.com", "YouFare", 180L, 30L);
     }
 
     /** Brevo 호출이 성공하도록 스텁하고, 전송 본문(textContent)에서 6자리 코드를 추출한다. */

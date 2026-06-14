@@ -76,7 +76,7 @@ public class AuthService {
     public String findUsername(String emailVerificationToken) {
         String email = verifiedEmailFromToken(emailVerificationToken);
 
-        User user = userRepository.findByEmailAndProvider(email, Provider.LOCAL)
+        User user = findUsableLocalAccount(email)
                 .orElseThrow(() -> accountNotFoundOrSocial(email));
 
         return user.getUsername();
@@ -90,7 +90,7 @@ public class AuthService {
     @Transactional(readOnly = true)
     public void checkResettable(String emailVerificationToken) {
         String email = verifiedEmailFromToken(emailVerificationToken);
-        userRepository.findByEmailAndProvider(email, Provider.LOCAL)
+        findUsableLocalAccount(email)
                 .orElseThrow(() -> accountNotFoundOrSocial(email));
     }
 
@@ -102,10 +102,20 @@ public class AuthService {
     public void resetPassword(ResetPasswordRequest request) {
         String email = verifiedEmailFromToken(request.getEmailVerificationToken());
 
-        User user = userRepository.findByEmailAndProvider(email, Provider.LOCAL)
+        User user = findUsableLocalAccount(email)
                 .orElseThrow(() -> accountNotFoundOrSocial(email));
 
         user.updatePassword(passwordEncoder.encode(request.getNewPassword()));
+    }
+
+    /**
+     * 폼 로그인이 실제로 가능한 LOCAL 계정만 찾는다.
+     * username이 비어 있는 LOCAL 행은 로그인 식별자가 없어 로그인 불가한 잔재 데이터(과거 구현 흔적)이므로
+     * "없는 것"으로 취급해, 아이디찾기/비번재설정이 소셜 계정 안내로 폴백하도록 한다.
+     */
+    private Optional<User> findUsableLocalAccount(String email) {
+        return userRepository.findByEmailAndProvider(email, Provider.LOCAL)
+                .filter(u -> u.getUsername() != null && !u.getUsername().isBlank());
     }
 
     /**
