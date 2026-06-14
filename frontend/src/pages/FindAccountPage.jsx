@@ -60,9 +60,47 @@ export default function FindAccountPage() {
   )
 }
 
+/* ---------- 소셜 가입 계정 안내 카드 ----------
+ * 백엔드가 A007(이미 소셜로 가입된 이메일)을 반환하면, 빨간 에러 대신
+ * 해당 소셜(네이버/카카오) 브랜드 색으로 "그쪽으로 로그인하세요"를 안내한다.
+ * 아이디찾기·비밀번호 재설정 두 흐름이 공유한다. */
+const PROVIDER_THEME = {
+  네이버: { bg: '#03C75A', fg: '#ffffff', soft: 'bg-emerald-50', ring: 'ring-emerald-200', mark: 'N' },
+  카카오: { bg: '#FEE500', fg: '#3C1E1E', soft: 'bg-amber-50', ring: 'ring-amber-200', mark: 'K' },
+}
+
+function SocialAccountNotice({ message, navigate }) {
+  const provider = message.includes('카카오') ? '카카오' : '네이버'
+  const t = PROVIDER_THEME[provider]
+  return (
+    <div className={`rounded-2xl ${t.soft} ring-1 ${t.ring} px-6 py-7 text-center animate-scale-in`}>
+      <div
+        className="mx-auto mb-4 w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black shadow-sm"
+        style={{ backgroundColor: t.bg, color: t.fg }}
+      >
+        {t.mark}
+      </div>
+      <p className="text-base font-bold text-slate-800">{provider} 계정으로 가입돼 있어요</p>
+      <p className="text-sm text-slate-500 mt-1.5 leading-relaxed">
+        이 이메일은 <b className="text-slate-700">{provider} 로그인</b>으로 가입한 계정이에요.<br />
+        아이디·비밀번호 대신 {provider}로 로그인해 주세요.
+      </p>
+      <button
+        type="button"
+        onClick={() => navigate('/login')}
+        className="mt-5 w-full font-bold py-3.5 rounded-2xl transition-all hover:-translate-y-0.5 hover:brightness-95 shadow-sm active:translate-y-0"
+        style={{ backgroundColor: t.bg, color: t.fg }}
+      >
+        {provider}로 로그인하러 가기
+      </button>
+    </div>
+  )
+}
+
 /* ---------- 아이디 찾기 ---------- */
 function FindUsernameFlow({ navigate }) {
   const [username, setUsername] = useState('')
+  const [socialMsg, setSocialMsg] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -75,11 +113,16 @@ function FindUsernameFlow({ navigate }) {
       if (found) setUsername(found)
       else setError('이 이메일로 가입한 아이디를 찾을 수 없어요.')
     } catch (err) {
-      setError(err.response?.data?.message || '아이디를 찾지 못했어요.')
+      const data = err.response?.data
+      // 소셜 가입 이메일이면 전용 안내 카드로 보여준다.
+      if (data?.code === 'A007') setSocialMsg(data.message)
+      else setError(data?.message || '아이디를 찾지 못했어요.')
     } finally {
       setLoading(false)
     }
   }
+
+  if (socialMsg) return <SocialAccountNotice message={socialMsg} navigate={navigate} />
 
   if (username) {
     return (
@@ -113,6 +156,7 @@ function ResetPasswordFlow({ navigate }) {
   const [pw, setPw] = useState('')
   const [pw2, setPw2] = useState('')
   const [error, setError] = useState('')
+  const [socialMsg, setSocialMsg] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [checking, setChecking] = useState(false)
 
@@ -127,11 +171,15 @@ function ResetPasswordFlow({ navigate }) {
       await api.post('/auth/reset-password/check', { emailVerificationToken: token })
       setEmailToken(token)
     } catch (err) {
-      setError(err.response?.data?.message || '비밀번호를 재설정할 수 없는 계정이에요.')
+      const data = err.response?.data
+      if (data?.code === 'A007') setSocialMsg(data.message)
+      else setError(data?.message || '비밀번호를 재설정할 수 없는 계정이에요.')
     } finally {
       setChecking(false)
     }
   }
+
+  if (socialMsg) return <SocialAccountNotice message={socialMsg} navigate={navigate} />
 
   async function submit(e) {
     e.preventDefault()
