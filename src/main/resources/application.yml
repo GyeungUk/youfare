@@ -96,6 +96,9 @@ auth:
   email:
     # 인증번호 유효시간(초). 기본 3분.
     code-ttl-seconds: ${AUTH_EMAIL_CODE_TTL_SECONDS:180}
+    # Brevo 발송 HTTP 호출 응답 타임아웃(초). 무료 인스턴스+해외 지연+콜드스타트로 10초를 넘겨
+    # 발송이 실패하던 문제가 있어 기본 30초. 여전히 타임아웃이 잦으면 45~60으로 올린다.
+    send-timeout-seconds: ${AUTH_EMAIL_SEND_TIMEOUT_SECONDS:30}
     # 발신 주소. Brevo에서 인증(verify)한 발신 이메일을 넣는다(도메인 없이 본인 주소 인증으로 가능).
     from: ${MAIL_FROM:}
     # 발신자 표시 이름.

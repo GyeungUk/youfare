@@ -33,8 +33,6 @@ public class EmailVerificationService {
 
     private static final int MAX_ATTEMPTS = 5;
     private static final SecureRandom RANDOM = new SecureRandom();
-    // 발송 호출이 응답 없이 매달리지 않도록 응답 타임아웃을 둔다(과거 SMTP 무한 대기 재발 방지).
-    private static final Duration SEND_TIMEOUT = Duration.ofSeconds(10);
 
     private final JwtProvider jwtProvider;
     private final WebClient brevoWebClient;
@@ -42,19 +40,26 @@ public class EmailVerificationService {
     private final String fromAddress;
     private final String fromName;
     private final long codeTtlSeconds;
+    // 발송 호출이 응답 없이 매달리지 않도록 응답 타임아웃을 둔다(과거 SMTP 무한 대기 재발 방지).
+    // Render 무료 인스턴스(저사양 CPU) + 싱가포르→Brevo(해외) 지연 + 콜드스타트 직후 첫 TLS 핸드셰이크가 겹치면
+    // 호출이 10초를 넘겨 TimeoutException으로 발송이 실패하던 문제가 있어 기본 30초로 넉넉히 잡고,
+    // 환경변수(AUTH_EMAIL_SEND_TIMEOUT_SECONDS)로 추가 조정할 수 있게 한다.
+    private final Duration sendTimeout;
 
     public EmailVerificationService(JwtProvider jwtProvider,
                                     WebClient brevoWebClient,
                                     @Value("${brevo.api-key:}") String apiKey,
                                     @Value("${auth.email.from:}") String fromAddress,
                                     @Value("${auth.email.from-name:YouFare}") String fromName,
-                                    @Value("${auth.email.code-ttl-seconds:180}") long codeTtlSeconds) {
+                                    @Value("${auth.email.code-ttl-seconds:180}") long codeTtlSeconds,
+                                    @Value("${auth.email.send-timeout-seconds:30}") long sendTimeoutSeconds) {
         this.jwtProvider = jwtProvider;
         this.brevoWebClient = brevoWebClient;
         this.apiKey = apiKey;
         this.fromAddress = fromAddress;
         this.fromName = fromName;
         this.codeTtlSeconds = codeTtlSeconds;
+        this.sendTimeout = Duration.ofSeconds(sendTimeoutSeconds);
     }
 
     // 키/발신주소 미설정 시 "인증요청만 누르면 항상 실패"의 원인을 기동 로그에서 바로 알 수 있게 경고한다.
@@ -145,7 +150,7 @@ public class EmailVerificationService {
                     .bodyValue(body)
                     .retrieve()
                     .bodyToMono(Void.class)
-                    .timeout(SEND_TIMEOUT)
+                    .timeout(sendTimeout)
                     .block();
         } catch (WebClientResponseException e) {
             // Brevo가 4xx/5xx로 거절(키 오류·발신주소 미인증 등). 본문에 사유가 들어있어 함께 남긴다.
